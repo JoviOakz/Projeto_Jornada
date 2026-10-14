@@ -1,0 +1,488 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #080c14;
+  color: #f3f4f6;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.app-container {
+  max-width: 1320px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Header */
+.header {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo-icon {
+  font-size: 32px;
+}
+
+.header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.header p {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* Abas de Visão */
+.view-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.view-tabs button {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-tabs button.active {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Layout Principal */
+.main-content {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+}
+
+@media (max-width: 960px) {
+  .main-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Container do Canvas */
+.canvas-card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.instruction-badge {
+  font-size: 12px;
+  background: #1e293b;
+  color: #38bdf8;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.canvas-wrapper-3d,
+.canvas-wrapper-2d {
+  width: 100%;
+  height: 480px;
+  background: #030712;
+  border-radius: 8px;
+  border: 1px solid #1f2937;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.crane-canvas-2d {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Sidebar e Controles */
+.controls-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.control-group {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+.label-with-value {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.value-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: #030712;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.button-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.button-toggle button {
+  flex: 1;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  padding: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.button-toggle button.active {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.select-input,
+.number-input {
+  width: 100%;
+  background: #030712;
+  border: 1px solid #334155;
+  color: #f3f4f6;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+}
+
+.slider-input {
+  width: 100%;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+/* Telemetria */
+.telemetry-card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.telemetry-card h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f3f4f6;
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.telemetry-item {
+  background: #030712;
+  border: 1px solid #1f2937;
+  padding: 10px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.telemetry-item.full-width {
+  grid-column: span 2;
+}
+
+.telemetry-label {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.telemetry-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.font-mono {
+  font-family: monospace;
+}
+
+/* Barra de Progresso e Regra Normativa de 85% */
+.progress-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.progress-track {
+  position: relative;
+  height: 12px;
+  background: #030712;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #1f2937;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.bg-green { background-color: #10b981; }
+.bg-amber { background-color: #f59e0b; }
+.bg-red { background-color: #ef4444; }
+
+.text-green { color: #10b981; }
+.text-amber { color: #f59e0b; }
+.text-red { color: #ef4444; }
+
+.normative-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #f59e0b;
+  z-index: 2;
+}
+
+.progress-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.marker-85 {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+/* Botões Globais */
+.btn-primary {
+  background: #2563eb;
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  background: #374151;
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Tabela Oficial */
+.table-section {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.legend-badge {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.load-chart-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: center;
+}
+
+.load-chart-table th,
+.load-chart-table td {
+  padding: 8px 10px;
+  border: 1px solid #1f2937;
+}
+
+.load-chart-table th {
+  background: #1e293b;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.load-chart-table .col-highlight {
+  background: #334155;
+  color: #ffffff;
+}
+
+.load-chart-table .row-header {
+  background: #1e293b;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.cell-value {
+  color: #6b7280;
+}
+
+.cell-value.active-safe {
+  background: #065f46 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.cell-value.active-warning {
+  background: #78350f !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.cell-value.active-overload {
+  background: #991b1b !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal-content {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  width: 520px;
+  max-width: 90%;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.status-box {
+  padding: 12px;
+  border-radius: 6px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.status-green { background: #065f46; color: #ffffff; }
+.status-red { background: #991b1b; color: #ffffff; }
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
