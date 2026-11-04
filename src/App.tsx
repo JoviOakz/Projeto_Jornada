@@ -44,10 +44,9 @@ const CHART_TM130: ChartTM130 = {
 };
 
 export const App: React.FC = () => {
-  // Estados Globais
   const [model, setModel] = useState<CraneModel>('MD300L');
   const [viewMode, setViewMode] = useState<ViewMode>('3D');
-  const [boomLength, setBoomLength] = useState<number>(17.7);
+  const [boomLength, setBoomLength] = useState<number>(() => 17.7);
   const [payloadKg, setPayloadKg] = useState<number>(8000);
   const [angle, setAngle] = useState<number>(45);
   const [rotation, setRotation] = useState<number>(45);
@@ -55,15 +54,6 @@ export const App: React.FC = () => {
 
   const mount3DRef = useRef<HTMLDivElement | null>(null);
   const canvas2DRef = useRef<HTMLCanvasElement | null>(null);
-
-  // Sincroniza comprimento padrão ao mudar de modelo
-  useEffect(() => {
-    if (model === 'MD300L') {
-      setBoomLength(17.7);
-    } else {
-      setBoomLength(12.4);
-    }
-  }, [model]);
 
   // --- MOTOR DE INTERPOLAÇÃO MATEMÁTICA ---
   const interpolateMD300L = useCallback((len: number, r: number): number | null => {
@@ -142,7 +132,6 @@ export const App: React.FC = () => {
 
     if (model === 'MD300L') {
       // Busca o raio limite onde a capacidade interpolada é igual ao peso total
-      let rSearch = minR;
       let foundLimit = maxR;
 
       for (let r = minR; r <= maxR; r += 0.2) {
@@ -240,19 +229,21 @@ export const App: React.FC = () => {
       depthWrite: false
     });
 
-    // Mesh da Zona Verde (Segura)
+    // Mesh da Zona Verde (Segura) - Anel entre minRadius e safeRadius
     const greenGeo = new THREE.RingGeometry(minPossibleRadius, safeRadiusGround, 64);
     const greenRingMesh = new THREE.Mesh(greenGeo, greenMat);
     greenRingMesh.rotation.x = Math.PI / 2;
+    greenRingMesh.name = 'greenRing';
     groundZoneGroup.add(greenRingMesh);
 
-    // Mesh da Zona Vermelha (Sobrecarga)
+    // Mesh da Zona Vermelha (Sobrecarga) - Anel entre safeRadius e maxRadius
     const redGeo = new THREE.RingGeometry(Math.max(minPossibleRadius, safeRadiusGround), maxPossibleRadius, 64);
     const redRingMesh = new THREE.Mesh(redGeo, redMat);
     redRingMesh.rotation.x = Math.PI / 2;
+    redRingMesh.name = 'redRing';
     groundZoneGroup.add(redRingMesh);
 
-    // Linha de contorno do raio atual no chão
+    // Linha de contorno do raio atual no chão (indicador visual fino)
     const currentRadiusLineGeo = new THREE.RingGeometry(radius - 0.08, radius + 0.08, 64);
     const currentRadiusLineMat = new THREE.MeshBasicMaterial({
       color: statusColorHex,
@@ -260,37 +251,42 @@ export const App: React.FC = () => {
     });
     const currentRadiusMesh = new THREE.Mesh(currentRadiusLineGeo, currentRadiusLineMat);
     currentRadiusMesh.rotation.x = Math.PI / 2;
+    currentRadiusMesh.name = 'currentRadiusLine';
     groundZoneGroup.add(currentRadiusMesh);
 
     // --- ESTRUTURA 3D DO GUINDASTE ---
     const craneGroup = new THREE.Group();
     scene.add(craneGroup);
 
-    // Chassi
+    // Chassi (base do caminhão)
     const chassis = new THREE.Mesh(
       new THREE.BoxGeometry(4, 1.2, 8),
       new THREE.MeshStandardMaterial({ color: 0x334155 })
     );
     chassis.position.y = 1;
+    chassis.castShadow = true;
     craneGroup.add(chassis);
 
-    // Cabine
+    // Cabine (comando)
     const cab = new THREE.Mesh(
       new THREE.BoxGeometry(3.8, 1.8, 2.2),
       new THREE.MeshStandardMaterial({ color: 0x1e293b })
     );
     cab.position.set(0, 2.3, 2.8);
+    cab.castShadow = true;
     craneGroup.add(cab);
 
-    // Sapatas
+    // Sapatas Estabilizadoras (4 pontas)
     const outMat = new THREE.MeshStandardMaterial({ color: 0x64748b });
     const outFront = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 0.6), outMat);
     outFront.position.set(0, 0.4, 2);
+    outFront.castShadow = true;
     const outRear = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 0.6), outMat);
     outRear.position.set(0, 0.4, -2);
+    outRear.castShadow = true;
     craneGroup.add(outFront, outRear);
 
-    // Mesa de Giro
+    // Mesa de Giro (slewing unit) - responsável pela rotação 360°
     const slewingGroup = new THREE.Group();
     slewingGroup.position.set(0, 1.8, -1);
     craneGroup.add(slewingGroup);
@@ -299,28 +295,32 @@ export const App: React.FC = () => {
       new THREE.CylinderGeometry(1.8, 1.8, 0.6, 24),
       new THREE.MeshStandardMaterial({ color: 0x475569 })
     );
+    baseTurret.castShadow = true;
     slewingGroup.add(baseTurret);
 
-    // Pivô de Elevação da Lança
+    // Pivô de Elevação da Lança (articulated boom joint)
     const boomPivotGroup = new THREE.Group();
     boomPivotGroup.position.set(0, 0.5, 0);
     slewingGroup.add(boomPivotGroup);
 
-    // Geometria da Lança
+    // Geometria da Lança (telescopic boom) - apontando para o CÉU (+Y em local coords)
     const boomMat = new THREE.MeshStandardMaterial({ color: statusColorHex, roughness: 0.3 });
     const baseBoomGeo = new THREE.BoxGeometry(0.8, 0.8, boomLength);
     baseBoomGeo.translate(0, 0, boomLength / 2);
     const boomMesh = new THREE.Mesh(baseBoomGeo, boomMat);
+    boomMesh.castShadow = true;
     boomPivotGroup.add(boomMesh);
 
-    // Cabo e Carga
+    // Cabo de Aço (steel rope/cable)
     const cableMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8 });
     const cableGeo = new THREE.BufferGeometry();
     const cableLine = new THREE.Line(cableGeo, cableMat);
     scene.add(cableLine);
 
+    // Bloco de Carga (payload/hook block)
     const payloadMat = new THREE.MeshStandardMaterial({ color: statusColorHex });
     const payloadMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), payloadMat);
+    payloadMesh.castShadow = true;
     scene.add(payloadMesh);
 
     let animationId: number;
@@ -328,22 +328,26 @@ export const App: React.FC = () => {
     const animate = () => {
       animationId = requestAnimationFrame(animate);
 
-      // Giro e Elevação
+      // Giro de Azimute (Y-axis rotation da mesa de giro)
       slewingGroup.rotation.y = radRot;
+      
+      // Elevação da Lança (X-axis rotation do pivô)
       boomPivotGroup.rotation.x = -radAngle;
 
+      // Sincronizar cores com o status (verde/âmbar/vermelho/cinza)
       boomMat.color.setHex(statusColorHex);
       payloadMat.color.setHex(statusColorHex);
       currentRadiusLineMat.color.setHex(statusColorHex);
 
-      // Posição global da ponta da lança
+      // Posição global da ponta da lança (tip of boom)
       const tipWorld = new THREE.Vector3(0, 0, boomLength);
       boomMesh.localToWorld(tipWorld);
 
-      // Posição da carga suspensa
+      // Posição da carga suspensa (payload hanging below)
       const payloadPos = new THREE.Vector3(tipWorld.x, Math.max(1, tipWorld.y - 4), tipWorld.z);
       payloadMesh.position.copy(payloadPos);
 
+      // Atualizar geometria do cabo
       cableGeo.setFromPoints([tipWorld, payloadPos]);
 
       controls.update();
