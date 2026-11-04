@@ -123,6 +123,7 @@ export const App: React.FC = () => {
   const usagePct = maxCapacityKg ? Math.round((totalLoadKg / maxCapacityKg) * 100) : 100;
 
   const isOverload = isOutOfChart || usagePct > 100;
+  const isDanger = !isOverload && usagePct >= 85 && usagePct <= 100;
   const isWarning = !isOverload && usagePct >= 85;
 
   // CÁLCULO DO RAIO MÁXIMO SEGURO NO CHÃO PARA A CARGA ATUAL
@@ -143,15 +144,16 @@ export const App: React.FC = () => {
       }
       return Math.max(minR, Math.min(maxR, foundLimit));
     } else {
-      // Para TM 130 baseado em ângulo
+      // Para TM 130 baseado em ângulo: encontrar ângulo máximo seguro
       const angles = CHART_TM130.angles;
-      let minSafeAngle = 70;
+      let maxSafeAngle = 0;
       for (const a of angles) {
         if (CHART_TM130.capacities[a] >= totalLoadKg) {
-          minSafeAngle = a;
+          maxSafeAngle = a;  // Ânulo mais elevado que ainda suporta a carga
         }
       }
-      const rLimit = boomLength * Math.cos((minSafeAngle * Math.PI) / 180);
+      // Converter ângulo máximo seguro para raio
+      const rLimit = boomLength * Math.cos((maxSafeAngle * Math.PI) / 180);
       return Math.max(minR, Math.min(maxR, rLimit));
     }
   }, [model, boomLength, totalLoadKg, interpolateMD300L]);
@@ -159,19 +161,58 @@ export const App: React.FC = () => {
   const maxPossibleRadius = boomLength * Math.cos((10 * Math.PI) / 180);
   const minPossibleRadius = Math.max(0.5, boomLength * Math.cos((70 * Math.PI) / 180));
 
+  // CÁLCULO DO RAIO MÁXIMO DE ADVERTÊNCIA (85% de utilização)
+  const warningRadiusGround = useMemo(() => {
+    if (model === 'MD300L') {
+      // Para MD300L: raio onde utilizamos 100% (sobrecarga)
+      let foundLimit = maxPossibleRadius;
+      for (let r = minPossibleRadius; r <= maxPossibleRadius; r += 0.2) {
+        const cap = interpolateMD300L(boomLength, r);
+        if (cap === null || cap < totalLoadKg) {
+          foundLimit = r;
+          break;
+        }
+      }
+      return foundLimit;
+    } else {
+      // Para TM130: ângulo onde utilizamos 100%
+      const angles = CHART_TM130.angles;
+      let maxSafeAngle = 0;
+      for (const a of angles) {
+        if (CHART_TM130.capacities[a] >= totalLoadKg) {
+          maxSafeAngle = a;
+        }
+      }
+      const rLimit = boomLength * Math.cos((maxSafeAngle * Math.PI) / 180);
+      return Math.min(maxPossibleRadius, rLimit);
+    }
+  }, [model, boomLength, totalLoadKg, interpolateMD300L, maxPossibleRadius, minPossibleRadius]);
+
+  // Zona Laranja é exibida quando safeRadius < warningRadius
+  const showOrangeZone = safeRadiusGround < warningRadiusGround;
+
+  // Validação: carga acima das perninha (sapatas) do guindaste
+  const sapataHalfWidth = 4;  // Metade da largura das sapatas (8m total)
+  const isCargoOverSapata = radius < sapataHalfWidth && hookHeight < 2;
+
+  // Validação: cabo atravessando a haste (colisão)
+  const cableClipsIntoHaste = angle > 60 && radius < 1.5;
+
   const statusColorHex = useMemo(() => {
-    if (isOutOfChart) return 0x64748b;
-    if (isOverload) return 0xef4444;
-    if (isWarning) return 0xf59e0b;
-    return 0x10b981;
-  }, [isOutOfChart, isOverload, isWarning]);
+    if (isOutOfChart) return 0x64748b;    // Cinza
+    if (isOverload) return 0xef4444;     // Vermelho
+    if (isDanger) return 0xf97316;       // Laranja
+    if (isWarning) return 0xf59e0b;      // Âmbar
+    return 0x10b981;                     // Verde
+  }, [isOutOfChart, isOverload, isDanger, isWarning]);
 
   const statusColorCSS = useMemo(() => {
-    if (isOutOfChart) return '#64748b';
-    if (isOverload) return '#ef4444';
-    if (isWarning) return '#f59e0b';
-    return '#10b981';
-  }, [isOutOfChart, isOverload, isWarning]);
+    if (isOutOfChart) return '#64748b';   // Cinza
+    if (isOverload) return '#ef4444';    // Vermelho
+    if (isDanger) return '#f97316';      // Laranja
+    if (isWarning) return '#f59e0b';     // Âmbar
+    return '#10b981';                    // Verde
+  }, [isOutOfChart, isOverload, isDanger, isWarning]);
 
   // --- AMBIENTE 3D THREE.JS COM ANÉIS DE ZONA NO CHÃO ---
   useEffect(() => {
@@ -206,12 +247,12 @@ export const App: React.FC = () => {
     const gridHelper = new THREE.GridHelper(60, 60, 0x3b82f6, 0x1e293b);
     scene.add(gridHelper);
 
-    // --- ANÉIS TRANSLÚCIDOS DE RAIO NO SOLO (VERDE E VERMELHO) ---
+    // --- ANÉIS TRANSLÚCIDOS DE RAIO NO SOLO (VERDE, LARANJA E VERMELHO) ---
     const groundZoneGroup = new THREE.Group();
     groundZoneGroup.position.set(0, 0.02, -1); // Alinhado com o centro do pino de giro
     scene.add(groundZoneGroup);
 
-    // Material Verde Translúcido
+    // Material Verde Translúcido (Operação Segura)
     const greenMat = new THREE.MeshBasicMaterial({
       color: 0x10b981,
       transparent: true,
@@ -220,7 +261,16 @@ export const App: React.FC = () => {
       depthWrite: false
     });
 
-    // Material Vermelho Translúcido
+    // Material Laranja Translúcido (PERIGO / Zona Crítica)
+    const orangeMat = new THREE.MeshBasicMaterial({
+      color: 0xf97316,
+      transparent: true,
+      opacity: 0.28,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+
+    // Material Vermelho Translúcido (Sobrecarga / REPROVADO)
     const redMat = new THREE.MeshBasicMaterial({
       color: 0xef4444,
       transparent: true,
@@ -236,8 +286,18 @@ export const App: React.FC = () => {
     greenRingMesh.name = 'greenRing';
     groundZoneGroup.add(greenRingMesh);
 
-    // Mesh da Zona Vermelha (Sobrecarga) - Anel entre safeRadius e maxRadius
-    const redGeo = new THREE.RingGeometry(Math.max(minPossibleRadius, safeRadiusGround), maxPossibleRadius, 64);
+    // Mesh da Zona Laranja (PERIGO - 85% a 100%) - Anel entre safeRadius e warningRadius
+    // Zona Laranja é exibida quando safeRadius < raio atual < warningRadius
+    if (showOrangeZone) {
+      const orangeGeo = new THREE.RingGeometry(Math.max(minPossibleRadius, safeRadiusGround), warningRadiusGround, 64);
+      const orangeRingMesh = new THREE.Mesh(orangeGeo, orangeMat);
+      orangeRingMesh.rotation.x = Math.PI / 2;
+      orangeRingMesh.name = 'orangeRing';
+      groundZoneGroup.add(orangeRingMesh);
+    }
+
+    // Mesh da Zona Vermelha (Sobrecarga) - Anel entre warningRadius e maxRadius
+    const redGeo = new THREE.RingGeometry(Math.max(minPossibleRadius, warningRadiusGround), maxPossibleRadius, 64);
     const redRingMesh = new THREE.Mesh(redGeo, redMat);
     redRingMesh.rotation.x = Math.PI / 2;
     redRingMesh.name = 'redRing';
@@ -257,6 +317,26 @@ export const App: React.FC = () => {
     // --- ESTRUTURA 3D DO GUINDASTE ---
     const craneGroup = new THREE.Group();
     scene.add(craneGroup);
+
+    // Indicador de PERIGO: Carga sobre a perninha (sapata)
+    if (isCargoOverSapata) {
+      const sapataWarningGeo = new THREE.BoxGeometry(8.2, 0.15, 0.8);
+      const sapataWarningMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const sapataWarningMesh = new THREE.Mesh(sapataWarningGeo, sapataWarningMat);
+      sapataWarningMesh.position.set(0, 0.5, -2);
+      sapataWarningMesh.name = 'sapataWarning';
+      craneGroup.add(sapataWarningMesh);
+    }
+
+    // Indicador de PERIGO: Cabo atravessando a haste
+    if (cableClipsIntoHaste) {
+      const cableWarningGeo = new THREE.BoxGeometry(0.5, 0.5, boomLength * 0.3);
+      const cableWarningMat = new THREE.MeshBasicMaterial({ color: 0xff6600 });
+      const cableWarningMesh = new THREE.Mesh(cableWarningGeo, cableWarningMat);
+      cableWarningMesh.position.set(0, 0.5, boomLength * 0.15);
+      cableWarningMesh.name = 'cableWarning';
+      craneGroup.add(cableWarningMesh);
+    }
 
     // Chassi (base do caminhão)
     const chassis = new THREE.Mesh(
@@ -457,6 +537,20 @@ export const App: React.FC = () => {
       ctx.fillStyle = '#38bdf8';
       ctx.fillText(`Raio: ${radius}m`, (pivotX + boomTipX) / 2, pivotY + 25);
       ctx.fillText(`Ângulo: ${angle}°`, pivotX + 30, pivotY - 15);
+
+      // Avisos de Perigo na Vista Lateral
+      if (isCargoOverSapata) {
+        ctx.fillStyle = '#ff0000';
+        ctx.font = 'bold 12px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠️ CARGA SOBRE SAPATA', width / 2, 25);
+      }
+      if (cableClipsIntoHaste) {
+        ctx.fillStyle = '#ff6600';
+        ctx.font = 'bold 12px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠️ PENETRAÇÃO NA HASTE', width / 2, cableClipsIntoHaste && isCargoOverSapata ? 45 : 25);
+      }
     } else if (viewMode === '2D_TOP') {
       const centerX = width / 2;
       const centerY = height / 2;
@@ -473,13 +567,20 @@ export const App: React.FC = () => {
       ctx.fillRect(centerX - 65, centerY - 45, 130, 10);
       ctx.fillRect(centerX - 65, centerY + 35, 130, 10);
 
-      // Zonas no Chão (Verde e Vermelho em 2D)
+      // Zonas no Chão (Verde, Laranja e Vermelho em 2D)
       const safePx = safeRadiusGround * scale;
       const maxPx = maxPossibleRadius * scale;
+      const warningPx = warningRadiusGround * scale;
 
       // Zona Vermelha Externa
       ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
       ctx.beginPath(); ctx.arc(centerX, centerY, maxPx, 0, Math.PI * 2); ctx.fill();
+
+      // Zona Laranja Intermediária (PERIGO 85-100%)
+      if (showOrangeZone) {
+        ctx.fillStyle = 'rgba(249, 115, 22, 0.30)';
+        ctx.beginPath(); ctx.arc(centerX, centerY, warningPx, 0, Math.PI * 2); ctx.fill();
+      }
 
       // Zona Verde Interna
       ctx.fillStyle = 'rgba(16, 185, 129, 0.35)';
@@ -505,6 +606,20 @@ export const App: React.FC = () => {
       ctx.fillStyle = statusColorCSS;
       ctx.beginPath(); ctx.arc(boomEndX, boomEndY, 10, 0, Math.PI * 2); ctx.fill();
 
+      // Avisos de Perigo
+      if (isCargoOverSapata) {
+        ctx.fillStyle = '#ff0000';
+        ctx.font = 'bold 12px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠️ CARGA SOBRE SAPATA', centerX, 25);
+      }
+      if (cableClipsIntoHaste) {
+        ctx.fillStyle = '#ff6600';
+        ctx.font = 'bold 12px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠️ PENETRAÇÃO NA HASTE', centerX, cableClipsIntoHaste && isCargoOverSapata ? 45 : 25);
+      }
+
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 11px Inter';
       ctx.textAlign = 'center';
@@ -518,11 +633,15 @@ export const App: React.FC = () => {
     boomLength,
     radius,
     safeRadiusGround,
+    warningRadiusGround,
+    showOrangeZone,
     maxPossibleRadius,
     payloadKg,
     statusColorCSS,
     radAngle,
-    radRot
+    radRot,
+    isCargoOverSapata,
+    cableClipsIntoHaste
   ]);
 
   return (
@@ -705,13 +824,13 @@ export const App: React.FC = () => {
             <div className="progress-box">
               <div className="progress-labels">
                 <span>Taxa de Utilização:</span>
-                <span className={isOverload ? 'text-red' : isWarning ? 'text-amber' : 'text-green'}>
+                <span className={isOverload ? 'text-red' : isDanger ? 'text-orange' : isWarning ? 'text-amber' : 'text-green'}>
                   {isOutOfChart ? 'Fora de Tabela' : `${usagePct}%`}
                 </span>
               </div>
               <div className="progress-track">
                 <div
-                  className={`progress-fill ${isOverload ? 'bg-red' : isWarning ? 'bg-amber' : 'bg-green'}`}
+                  className={`progress-fill ${isOverload ? 'bg-red' : isDanger ? 'bg-orange' : isWarning ? 'bg-amber' : 'bg-green'}`}
                   style={{ width: `${Math.min(100, usagePct)}%` }}
                 />
                 <div className="normative-line" style={{ left: '85%' }} title="Limite Normativo 85% (RN01)" />
@@ -721,6 +840,37 @@ export const App: React.FC = () => {
                 <span className="marker-85">85% Norma</span>
                 <span>100% Máx</span>
               </div>
+            </div>
+
+            {/* Avisos de Perigos Físicos */}
+            <div className="warnings-box">
+              {isCargoOverSapata && (
+                <div className="warning-item warning-critical">
+                  <span className="warning-icon">⚠️</span>
+                  <div className="warning-content">
+                    <strong>RISCO: Carga sobre Sapata</strong>
+                    <p>A carga está posicionada acima da perninha do guindaste. Descida não é permitida por risco de colisão.</p>
+                  </div>
+                </div>
+              )}
+              {cableClipsIntoHaste && (
+                <div className="warning-item warning-critical">
+                  <span className="warning-icon">⚠️</span>
+                  <div className="warning-content">
+                    <strong>RISCO: Penetração da Haste</strong>
+                    <p>Com o ângulo muito elevado, o cabo/carga atravessa a haste. Reduzir ângulo de elevação ou aumentar raio.</p>
+                  </div>
+                </div>
+              )}
+              {isDanger && !isOverload && (
+                <div className="warning-item warning-danger">
+                  <span className="warning-icon">⚠️</span>
+                  <div className="warning-content">
+                    <strong>ZONA CRÍTICA (85-100%)</strong>
+                    <p>Operação está na zona laranja. Margem normativa de segurança (RN01) quase atingida. Procedência recomendada: aumentar raio ou reduzir carga.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </section>

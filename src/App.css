@@ -298,10 +298,12 @@ body {
 }
 
 .bg-green { background-color: #10b981; }
+.bg-orange { background-color: #f97316; }
 .bg-amber { background-color: #f59e0b; }
 .bg-red { background-color: #ef4444; }
 
 .text-green { color: #10b981; }
+.text-orange { color: #f97316; }
 .text-amber { color: #f59e0b; }
 .text-red { color: #ef4444; }
 
@@ -485,4 +487,57 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+/* Caixa de Avisos / Warnings */
+.warnings-box {
+  background: #1a1f2e;
+  border: 1px solid #2d3748;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.warning-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 6px;
+  border-left: 3px solid;
+  align-items: flex-start;
+}
+
+.warning-item.warning-critical {
+  background: rgba(239, 68, 68, 0.10);
+  border-color: #ef4444;
+}
+
+.warning-item.warning-danger {
+  background: rgba(249, 115, 22, 0.10);
+  border-color: #f97316;
+}
+
+.warning-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.warning-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.warning-content strong {
+  font-size: 12px;
+  color: #ffffff;
+}
+
+.warning-content p {
+  font-size: 11px;
+  color: #cbd5e1;
+  line-height: 1.4;
 }
