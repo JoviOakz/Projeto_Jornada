@@ -126,47 +126,59 @@ export const App: React.FC = () => {
   const isDanger = !isOverload && usagePct >= 85 && usagePct <= 100;
   const isWarning = !isOverload && usagePct >= 85;
 
-  // CÁLCULO DO RAIO MÁXIMO SEGURO NO CHÃO PARA A CARGA ATUAL
+  const maxPossibleRadius = boomLength * Math.cos((10 * Math.PI) / 180);
+  const minPossibleRadius = Math.max(0.5, boomLength * Math.cos((70 * Math.PI) / 180));
+
+  // CÁLCULO DO RAIO MÁXIMO SEGURO NO CHÃO (onde utilização ≤ 84%)
   const safeRadiusGround = useMemo(() => {
-    const minR = Math.max(1, boomLength * Math.cos((70 * Math.PI) / 180));
-    const maxR = boomLength * Math.cos((10 * Math.PI) / 180);
+    const minR = minPossibleRadius;
+    const maxR = maxPossibleRadius;
 
     if (model === 'MD300L') {
-      // Busca o raio limite onde a capacidade interpolada é igual ao peso total
+      // Para MD300L: encontrar raio onde a capacidade ≤ 84% (operação segura)
+      // Isto é: encontrar raio onde cap = totalLoadKg / 0.84
+      const targetCapacity = totalLoadKg / 0.84;
       let foundLimit = maxR;
 
       for (let r = minR; r <= maxR; r += 0.2) {
         const cap = interpolateMD300L(boomLength, r);
-        if (cap === null || cap < totalLoadKg) {
+        if (cap === null || cap < targetCapacity) {
           foundLimit = r;
           break;
         }
       }
       return Math.max(minR, Math.min(maxR, foundLimit));
     } else {
-      // Para TM 130 baseado em ângulo: encontrar ângulo máximo seguro
+      // Para TM130: encontrar o MAIOR ângulo onde CAPACIDADE >= 85% DO PESO
+      // Isto significa: iterar de TRÁS para FRENTE (de 70° a 0°)
+      // e parar no primeiro ângulo que NÃO suporta 85%
+      const targetCapacity = totalLoadKg / 0.84;
       const angles = CHART_TM130.angles;
-      let maxSafeAngle = 0;
-      for (const a of angles) {
-        if (CHART_TM130.capacities[a] >= totalLoadKg) {
-          maxSafeAngle = a;  // Ânulo mais elevado que ainda suporta a carga
+      let safeLimitAngle = 70;
+
+      // Iterar DE TRÁS PARA FRENTE para encontrar último ângulo que FALHA em 84%
+      for (let i = angles.length - 1; i >= 0; i--) {
+        const a = angles[i];
+        if (CHART_TM130.capacities[a] < targetCapacity) {
+          safeLimitAngle = a;
+          break;
         }
       }
-      // Converter ângulo máximo seguro para raio
-      const rLimit = boomLength * Math.cos((maxSafeAngle * Math.PI) / 180);
+
+      const rLimit = boomLength * Math.cos((safeLimitAngle * Math.PI) / 180);
       return Math.max(minR, Math.min(maxR, rLimit));
     }
-  }, [model, boomLength, totalLoadKg, interpolateMD300L]);
+  }, [model, boomLength, totalLoadKg, interpolateMD300L, maxPossibleRadius, minPossibleRadius]);
 
-  const maxPossibleRadius = boomLength * Math.cos((10 * Math.PI) / 180);
-  const minPossibleRadius = Math.max(0.5, boomLength * Math.cos((70 * Math.PI) / 180));
-
-  // CÁLCULO DO RAIO MÁXIMO DE ADVERTÊNCIA (85% de utilização)
+  // CÁLCULO DO RAIO MÁXIMO DE ADVERTÊNCIA (onde utilização = 100%)
   const warningRadiusGround = useMemo(() => {
+    const minR = minPossibleRadius;
+    const maxR = maxPossibleRadius;
+
     if (model === 'MD300L') {
-      // Para MD300L: raio onde utilizamos 100% (sobrecarga)
-      let foundLimit = maxPossibleRadius;
-      for (let r = minPossibleRadius; r <= maxPossibleRadius; r += 0.2) {
+      // Para MD300L: raio onde capacidade = 100% DO PESO (início da sobrecarga)
+      let foundLimit = maxR;
+      for (let r = minR; r <= maxR; r += 0.2) {
         const cap = interpolateMD300L(boomLength, r);
         if (cap === null || cap < totalLoadKg) {
           foundLimit = r;
@@ -175,16 +187,23 @@ export const App: React.FC = () => {
       }
       return foundLimit;
     } else {
-      // Para TM130: ângulo onde utilizamos 100%
+      // Para TM130: encontrar o MAIOR ângulo onde CAPACIDADE >= 100% DO PESO
+      // Isto significa: iterar de TRÁS para FRENTE (de 70° a 0°)
+      // e parar no primeiro ângulo que NÃO suporta 100%
       const angles = CHART_TM130.angles;
-      let maxSafeAngle = 0;
-      for (const a of angles) {
-        if (CHART_TM130.capacities[a] >= totalLoadKg) {
-          maxSafeAngle = a;
+      let warningAngle = 70;
+
+      // Iterar DE TRÁS PARA FRENTE para encontrar último ângulo que FALHA em 100%
+      for (let i = angles.length - 1; i >= 0; i--) {
+        const a = angles[i];
+        if (CHART_TM130.capacities[a] < totalLoadKg) {
+          warningAngle = a;
+          break;
         }
       }
-      const rLimit = boomLength * Math.cos((maxSafeAngle * Math.PI) / 180);
-      return Math.min(maxPossibleRadius, rLimit);
+
+      const rLimit = boomLength * Math.cos((warningAngle * Math.PI) / 180);
+      return Math.max(minR, Math.min(maxR, rLimit));
     }
   }, [model, boomLength, totalLoadKg, interpolateMD300L, maxPossibleRadius, minPossibleRadius]);
 
