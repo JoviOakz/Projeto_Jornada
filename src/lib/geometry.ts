@@ -1,8 +1,11 @@
-export const degToRad = (deg: number): number => (deg * Math.PI) / 180;
+import type { AngleRange } from '../types';
 
-/** Faixa de ângulos usada para calcular os raios mínimo/máximo possíveis. */
-export const MIN_BOOM_ANGLE_DEG = 10;
-export const MAX_BOOM_ANGLE_DEG = 70;
+export const degToRad = (deg: number): number => (deg * Math.PI) / 180;
+export const radToDeg = (rad: number): number => (rad * 180) / Math.PI;
+
+/** Ângulo de elevação (°) necessário para a lança atingir um dado raio horizontal. */
+export const radiusToAngleDeg = (radius: number, boomLength: number): number =>
+  radToDeg(Math.acos(Math.min(1, Math.max(-1, radius / boomLength))));
 
 /** Altura do pivô da lança em relação ao solo (m). */
 export const PIVOT_HEIGHT_M = 2.5;
@@ -19,7 +22,13 @@ export interface Geometry {
   maxPossibleRadius: number;
 }
 
-export function computeGeometry(boomLength: number, angle: number, rotation: number): Geometry {
+/** Raios mínimo/máximo alcançáveis, dados os limites de elevação do modelo. */
+export function computeGeometry(
+  boomLength: number,
+  angle: number,
+  rotation: number,
+  angleRange: AngleRange
+): Geometry {
   const radAngle = degToRad(angle);
   const radRot = degToRad(rotation);
 
@@ -34,7 +43,7 @@ export function computeGeometry(boomLength: number, angle: number, rotation: num
     coordX: Number((radius * Math.sin(radRot)).toFixed(2)),
     coordY: hookHeight,
     coordZ: Number((radius * Math.cos(radRot)).toFixed(2)),
-    maxPossibleRadius: boomLength * Math.cos(degToRad(MIN_BOOM_ANGLE_DEG)),
-    minPossibleRadius: Math.max(0.5, boomLength * Math.cos(degToRad(MAX_BOOM_ANGLE_DEG)))
+    maxPossibleRadius: boomLength * Math.cos(degToRad(angleRange.min)),
+    minPossibleRadius: Math.max(0.5, boomLength * Math.cos(degToRad(angleRange.max)))
   };
 }

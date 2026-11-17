@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { LiftAnalysis, LiftInputs, View2D } from '../types';
+import { degToRad } from '../lib/geometry';
+import { MD300L_FRONTAL_HALF_ARC_DEG } from '../data/limits';
 
 interface Crane2DProps {
   view: View2D;
@@ -10,7 +12,7 @@ interface Crane2DProps {
 export const Crane2D: React.FC<Crane2DProps> = ({ view, inputs, analysis }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const { boomLength, payloadKg, angle, rotation } = inputs;
+  const { model, boomLength, payloadKg, angle, rotation } = inputs;
   const {
     radius,
     radAngle,
@@ -21,8 +23,10 @@ export const Crane2D: React.FC<Crane2DProps> = ({ view, inputs, analysis }) => {
     showOrangeZone,
     isCargoOverSapata,
     cableClipsIntoHaste,
-    statusColorCSS
+    statusColorCSS,
+    slewRange
   } = analysis;
+  const { min: slewMin, max: slewMax, continuous: slewContinuous } = slewRange;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -134,26 +138,51 @@ export const Crane2D: React.FC<Crane2DProps> = ({ view, inputs, analysis }) => {
       const maxPx = maxPossibleRadius * scale;
       const warningPx = warningRadiusGround * scale;
 
-      // Vermelha (externa)
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
-      ctx.beginPath(); ctx.arc(centerX, centerY, maxPx, 0, Math.PI * 2); ctx.fill();
+      // Azimute ψ (0° = para cima, horário) => ângulo do canvas = ψ - 90°
+      const sectorA0 = slewContinuous ? 0 : degToRad(slewMin) - Math.PI / 2;
+      const sectorA1 = slewContinuous ? Math.PI * 2 : degToRad(slewMax) - Math.PI / 2;
 
-      // Laranja (intermediária)
-      if (showOrangeZone) {
-        ctx.fillStyle = 'rgba(249, 115, 22, 0.30)';
-        ctx.beginPath(); ctx.arc(centerX, centerY, warningPx, 0, Math.PI * 2); ctx.fill();
+      const fillSector = (r: number, a0: number, a1: number, color: string) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, r, a0, a1);
+        ctx.closePath();
+        ctx.fill();
+      };
+
+      // Setor proibido (giro restrito)
+      if (!slewContinuous) {
+        fillSector(maxPx, sectorA1, sectorA0 + Math.PI * 2, 'rgba(100, 116, 139, 0.18)');
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('Setor proibido', centerX, centerY - maxPx + 14);
       }
 
-      // Verde (interna)
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.35)';
-      ctx.beginPath(); ctx.arc(centerX, centerY, safePx, 0, Math.PI * 2); ctx.fill();
+      // Setor frontal do MD300L (capacidade reduzida)
+      if (model === 'MD300L') {
+        const f0 = degToRad(-MD300L_FRONTAL_HALF_ARC_DEG) - Math.PI / 2;
+        const f1 = degToRad(MD300L_FRONTAL_HALF_ARC_DEG) - Math.PI / 2;
+        fillSector(maxPx, f0, f1, 'rgba(245, 158, 11, 0.12)');
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = '10px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('Frontal (reduzida)', centerX, centerY - maxPx + 14);
+      }
+
+      fillSector(maxPx, sectorA0, sectorA1, 'rgba(239, 68, 68, 0.25)');       // Vermelha
+      if (showOrangeZone) {
+        fillSector(warningPx, sectorA0, sectorA1, 'rgba(249, 115, 22, 0.30)'); // Laranja
+      }
+      fillSector(safePx, sectorA0, sectorA1, 'rgba(16, 185, 129, 0.35)');      // Verde
 
       // Anel do raio atual
       const radiusPx = radius * scale;
       ctx.strokeStyle = statusColorCSS;
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.arc(centerX, centerY, radiusPx, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(centerX, centerY, radiusPx, sectorA0, sectorA1); ctx.stroke();
       ctx.setLineDash([]);
 
       // Haste
@@ -190,6 +219,7 @@ export const Crane2D: React.FC<Crane2DProps> = ({ view, inputs, analysis }) => {
     }
   }, [
     view,
+    model,
     angle,
     rotation,
     boomLength,
@@ -203,7 +233,10 @@ export const Crane2D: React.FC<Crane2DProps> = ({ view, inputs, analysis }) => {
     showOrangeZone,
     isCargoOverSapata,
     cableClipsIntoHaste,
-    statusColorCSS
+    statusColorCSS,
+    slewMin,
+    slewMax,
+    slewContinuous
   ]);
 
   return (

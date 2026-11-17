@@ -1,6 +1,6 @@
 import { CHART_MD300L, CHART_TM130 } from '../data/charts';
 import type { CraneModel } from '../types';
-import { degToRad } from './geometry';
+import { radiusToAngleDeg } from './geometry';
 
 /** Limite normativo RN01: acima disso a operação é reprovada. */
 export const NORMATIVE_LIMIT_PCT = 85;
@@ -76,64 +76,51 @@ interface RadiusLimitParams {
   maxR: number;
 }
 
+const RADIUS_STEP_M = 0.1;
+
+/** Capacidade (kg) em um dado raio, para qualquer modelo. */
+function capacityAtRadius(model: CraneModel, boomLength: number, r: number): number | null {
+  return model === 'MD300L'
+    ? interpolateMD300L(boomLength, r)
+    : interpolateTM130(radiusToAngleDeg(r, boomLength));
+}
+
+/**
+ * Maior raio (contíguo a partir do mínimo) em que a capacidade ainda atende a `requiredCapacity`.
+ * - Se nem o raio mínimo atende, retorna `minR` (zona vazia).
+ * - Se todos os raios atendem, retorna `maxR` (zona completa).
+ */
+function findLimitRadius(
+  model: CraneModel,
+  boomLength: number,
+  requiredCapacity: number,
+  minR: number,
+  maxR: number
+): number {
+  const first = capacityAtRadius(model, boomLength, minR);
+  if (first === null || first < requiredCapacity) return minR;
+
+  const steps = Math.ceil((maxR - minR) / RADIUS_STEP_M);
+  let lastOk = minR;
+  for (let i = 1; i <= steps; i++) {
+    const r = Math.min(minR + i * RADIUS_STEP_M, maxR);
+    const cap = capacityAtRadius(model, boomLength, r);
+    if (cap === null || cap < requiredCapacity) return lastOk;
+    lastOk = r;
+  }
+  return maxR;
+}
+
 /** Raio máximo onde a utilização ainda fica abaixo do limite seguro (zona verde). */
-// TODO: TM130 usa o ângulo que falha (uma etapa não-conservadora) e,
-// se nenhum ângulo falha, retorna o raio mínimo.
 export function computeSafeRadiusGround({
   model, boomLength, totalLoadKg, minR, maxR
 }: RadiusLimitParams): number {
-  const targetCapacity = totalLoadKg / SAFE_RADIUS_RATIO;
-
-  if (model === 'MD300L') {
-    let foundLimit = maxR;
-    for (let r = minR; r <= maxR; r += 0.2) {
-      const cap = interpolateMD300L(boomLength, r);
-      if (cap === null || cap < targetCapacity) {
-        foundLimit = r;
-        break;
-      }
-    }
-    return Math.max(minR, Math.min(maxR, foundLimit));
-  }
-
-  const angles = CHART_TM130.angles;
-  let safeLimitAngle = 70;
-  for (let i = angles.length - 1; i >= 0; i--) {
-    const a = angles[i];
-    if (CHART_TM130.capacities[a] < targetCapacity) {
-      safeLimitAngle = a;
-      break;
-    }
-  }
-  const rLimit = boomLength * Math.cos(degToRad(safeLimitAngle));
-  return Math.max(minR, Math.min(maxR, rLimit));
+  return findLimitRadius(model, boomLength, totalLoadKg / SAFE_RADIUS_RATIO, minR, maxR);
 }
 
 /** Raio máximo onde a carga ainda é suportada (100% da capacidade) — início da zona vermelha. */
 export function computeWarningRadiusGround({
   model, boomLength, totalLoadKg, minR, maxR
 }: RadiusLimitParams): number {
-  if (model === 'MD300L') {
-    let foundLimit = maxR;
-    for (let r = minR; r <= maxR; r += 0.2) {
-      const cap = interpolateMD300L(boomLength, r);
-      if (cap === null || cap < totalLoadKg) {
-        foundLimit = r;
-        break;
-      }
-    }
-    return foundLimit;
-  }
-
-  const angles = CHART_TM130.angles;
-  let warningAngle = 70;
-  for (let i = angles.length - 1; i >= 0; i--) {
-    const a = angles[i];
-    if (CHART_TM130.capacities[a] < totalLoadKg) {
-      warningAngle = a;
-      break;
-    }
-  }
-  const rLimit = boomLength * Math.cos(degToRad(warningAngle));
-  return Math.max(minR, Math.min(maxR, rLimit));
+  return findLimitRadius(model, boomLength, totalLoadKg, minR, maxR);
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { LiftAnalysis, LiftInputs } from '../types';
+import { degToRad } from '../lib/geometry';
 
 interface Crane3DProps {
   inputs: LiftInputs;
@@ -25,8 +26,10 @@ export const Crane3D: React.FC<Crane3DProps> = ({ inputs, analysis }) => {
     showOrangeZone,
     isCargoOverSapata,
     cableClipsIntoHaste,
-    statusColorHex
+    statusColorHex,
+    slewRange
   } = analysis;
+  const { min: slewMin, max: slewMax, continuous: slewContinuous } = slewRange;
 
   useEffect(() => {
     const container = mountRef.current;
@@ -58,6 +61,12 @@ export const Crane3D: React.FC<Crane3DProps> = ({ inputs, analysis }) => {
     const gridHelper = new THREE.GridHelper(60, 60, 0x3b82f6, 0x1e293b);
     scene.add(gridHelper);
 
+    // Setor angular dos anéis (360° ou setor restrito, ex.: TM130 traseiro 120°).
+    // Azimute ψ (0° = +Z, cresce para +X) => ângulo do RingGeometry φ = 90° - ψ.
+    const ringStart = slewContinuous ? 0 : Math.PI / 2 - degToRad(slewMax);
+    const ringLength = slewContinuous ? Math.PI * 2 : degToRad(slewMax - slewMin);
+    const ringSegs = Math.max(8, Math.round((64 * ringLength) / (Math.PI * 2)));
+
     // --- ANÉIS TRANSLÚCIDOS DE RAIO NO SOLO (VERDE, LARANJA E VERMELHO) ---
     const groundZoneGroup = new THREE.Group();
     groundZoneGroup.position.set(0, 0.02, -1); // Alinhado com o centro do pino de giro
@@ -77,7 +86,7 @@ export const Crane3D: React.FC<Crane3DProps> = ({ inputs, analysis }) => {
     const redMat = zoneMaterial(0xef4444);    // Sobrecarga / reprovado
 
     // Zona Verde (Segura)
-    const greenGeo = new THREE.RingGeometry(minPossibleRadius, safeRadiusGround, 64);
+    const greenGeo = new THREE.RingGeometry(minPossibleRadius, safeRadiusGround, ringSegs, 1, ringStart, ringLength);
     const greenRingMesh = new THREE.Mesh(greenGeo, greenMat);
     greenRingMesh.rotation.x = Math.PI / 2;
     greenRingMesh.name = 'greenRing';
@@ -88,7 +97,10 @@ export const Crane3D: React.FC<Crane3DProps> = ({ inputs, analysis }) => {
       const orangeGeo = new THREE.RingGeometry(
         Math.max(minPossibleRadius, safeRadiusGround),
         warningRadiusGround,
-        64
+        ringSegs,
+        1,
+        ringStart,
+        ringLength
       );
       const orangeRingMesh = new THREE.Mesh(orangeGeo, orangeMat);
       orangeRingMesh.rotation.x = Math.PI / 2;
@@ -100,7 +112,10 @@ export const Crane3D: React.FC<Crane3DProps> = ({ inputs, analysis }) => {
     const redGeo = new THREE.RingGeometry(
       Math.max(minPossibleRadius, warningRadiusGround),
       maxPossibleRadius,
-      64
+      ringSegs,
+      1,
+      ringStart,
+      ringLength
     );
     const redRingMesh = new THREE.Mesh(redGeo, redMat);
     redRingMesh.rotation.x = Math.PI / 2;
@@ -108,7 +123,7 @@ export const Crane3D: React.FC<Crane3DProps> = ({ inputs, analysis }) => {
     groundZoneGroup.add(redRingMesh);
 
     // Linha do raio atual no chão
-    const currentRadiusLineGeo = new THREE.RingGeometry(radius - 0.08, radius + 0.08, 64);
+    const currentRadiusLineGeo = new THREE.RingGeometry(radius - 0.08, radius + 0.08, ringSegs, 1, ringStart, ringLength);
     const currentRadiusLineMat = new THREE.MeshBasicMaterial({
       color: statusColorHex,
       side: THREE.DoubleSide
@@ -261,7 +276,10 @@ export const Crane3D: React.FC<Crane3DProps> = ({ inputs, analysis }) => {
     showOrangeZone,
     isCargoOverSapata,
     cableClipsIntoHaste,
-    statusColorHex
+    statusColorHex,
+    slewMin,
+    slewMax,
+    slewContinuous
   ]);
 
   return <div className="canvas-wrapper-3d" ref={mountRef} />;

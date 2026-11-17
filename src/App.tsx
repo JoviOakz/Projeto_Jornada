@@ -3,6 +3,7 @@ import './App.css';
 
 import type { LiftInputs, ViewMode } from './types';
 import { useLiftAnalysis } from './hooks/useLiftAnalysis';
+import { normalizeInputs } from './lib/limits';
 import { Crane3D } from './components/Crane3D';
 import { Crane2D } from './components/Crane2D';
 import { ControlsPanel } from './components/ControlsPanel';
@@ -36,7 +37,8 @@ export const App: React.FC = () => {
   const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
 
   const updateInputs = useCallback(
-    (patch: Partial<LiftInputs>) => setInputs((prev) => ({ ...prev, ...patch })),
+    (patch: Partial<LiftInputs>) =>
+      setInputs((prev) => normalizeInputs({ ...prev, ...patch }, prev.model)),
     []
   );
 

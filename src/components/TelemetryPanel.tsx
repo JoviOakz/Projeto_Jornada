@@ -1,6 +1,7 @@
 import React from 'react';
 import type { LiftAnalysis } from '../types';
 import { NORMATIVE_LIMIT_PCT } from '../lib/capacity';
+import { SECTOR_LABELS } from '../lib/limits';
 
 interface TelemetryPanelProps {
   analysis: LiftAnalysis;
@@ -19,7 +20,8 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({ analysis }) => {
     isDanger,
     isWarning,
     isCargoOverSapata,
-    cableClipsIntoHaste
+    cableClipsIntoHaste,
+    sector
   } = analysis;
 
   const colorSuffix = isOverload ? 'red' : isDanger ? 'orange' : isWarning ? 'amber' : 'green';
@@ -39,6 +41,10 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({ analysis }) => {
         <div className="telemetry-item full-width">
           <span className="telemetry-label">Raio Máximo Seguro no Solo</span>
           <span className="telemetry-value text-green">{safeRadiusGround.toFixed(1)} m</span>
+        </div>
+        <div className="telemetry-item full-width">
+          <span className="telemetry-label">Setor de Operação</span>
+          <span className="telemetry-value">{SECTOR_LABELS[sector]}</span>
         </div>
         <div className="telemetry-item">
           <span className="telemetry-label">Capacidade Máxima</span>
@@ -95,6 +101,15 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({ analysis }) => {
             <div className="warning-content">
               <strong>RISCO: Penetração da Haste</strong>
               <p>Com o ângulo muito elevado, o cabo/carga atravessa a haste. Reduzir ângulo de elevação ou aumentar raio.</p>
+            </div>
+          </div>
+        )}
+        {sector === 'FRONTAL' && (
+          <div className="warning-item warning-danger">
+            <span className="warning-icon">⚠️</span>
+            <div className="warning-content">
+              <strong>Setor Frontal (sobre a cabine)</strong>
+              <p>Capacidade reduzida neste setor. Conferir a tabela frontal oficial (exceto com patola dianteira auxiliar).</p>
             </div>
           </div>
         )}

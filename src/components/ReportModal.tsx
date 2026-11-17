@@ -1,6 +1,7 @@
 import React from 'react';
 import type { LiftAnalysis, LiftInputs } from '../types';
 import { NORMATIVE_LIMIT_PCT } from '../lib/capacity';
+import { SECTOR_LABELS } from '../lib/limits';
 
 interface ReportModalProps {
   inputs: LiftInputs;
@@ -21,7 +22,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({ inputs, analysis, onCl
     maxCapacityKg,
     usagePct,
     isOverload,
-    isApproved
+    isApproved,
+    sector
   } = analysis;
 
   // RN01: acima de 85% a operação é reprovada.
@@ -46,6 +48,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ inputs, analysis, onCl
             <div><strong>Comprimento da Lança:</strong> {boomLength} m</div>
             <div><strong>Ângulo de Elevação:</strong> {angle}°</div>
             <div><strong>Giro de Azimute:</strong> {rotation}°</div>
+            <div><strong>Setor de Operação:</strong> {SECTOR_LABELS[sector]}</div>
             <div><strong>Raio de Operação:</strong> {radius} m</div>
             <div><strong>Raio Máximo Seguro no Solo:</strong> {safeRadiusGround.toFixed(1)} m</div>
             <div><strong>Altura do Gancho:</strong> {hookHeight} m</div>

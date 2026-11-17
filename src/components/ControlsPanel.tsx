@@ -1,6 +1,7 @@
 import React from 'react';
 import type { LiftInputs } from '../types';
 import { CHART_MD300L } from '../data/charts';
+import { getAngleRange, getSlewRange } from '../lib/limits';
 
 interface ControlsPanelProps {
   inputs: LiftInputs;
@@ -9,6 +10,8 @@ interface ControlsPanelProps {
 
 export const ControlsPanel: React.FC<ControlsPanelProps> = ({ inputs, onChange }) => {
   const { model, boomLength, angle, rotation, payloadKg } = inputs;
+  const angleRange = getAngleRange(model, boomLength);
+  const slewRange = getSlewRange(model);
 
   return (
     <>
@@ -57,12 +60,15 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({ inputs, onChange }
         </div>
         <input
           type="range"
-          min="10"
-          max="80"
+          min={angleRange.min}
+          max={angleRange.max}
           value={angle}
           onChange={(e) => onChange({ angle: Number(e.target.value) })}
           className="slider-input"
         />
+        <span className="telemetry-label">
+          Faixa permitida: {angleRange.min}° a {angleRange.max}°
+        </span>
       </div>
 
       {/* Giro de Azimute */}
@@ -73,12 +79,17 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({ inputs, onChange }
         </div>
         <input
           type="range"
-          min="0"
-          max="360"
+          min={slewRange.min}
+          max={slewRange.max}
           value={rotation}
           onChange={(e) => onChange({ rotation: Number(e.target.value) })}
           className="slider-input"
         />
+        <span className="telemetry-label">
+          {slewRange.continuous
+            ? 'Giro contínuo de 360° (0° = sobre a cabine)'
+            : `Setor traseiro restrito: ${slewRange.min}° a ${slewRange.max}° (180° = atrás)`}
+        </span>
       </div>
 
       {/* Peso da Carga */}

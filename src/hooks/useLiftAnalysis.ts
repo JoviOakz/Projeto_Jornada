@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { LiftAnalysis, LiftInputs } from '../types';
 import { computeGeometry } from '../lib/geometry';
+import { getAngleRange, getOperatingSector, getSlewRange } from '../lib/limits';
 import {
   HOOK_WEIGHT_KG,
   NORMATIVE_LIMIT_PCT,
@@ -16,9 +17,13 @@ const SAPATA_HALF_WIDTH_M = 4;
 export function useLiftAnalysis(inputs: LiftInputs): LiftAnalysis {
   const { model, boomLength, payloadKg, angle, rotation } = inputs;
 
+  const angleRange = useMemo(() => getAngleRange(model, boomLength), [model, boomLength]);
+  const slewRange = getSlewRange(model);
+  const sector = getOperatingSector(model, rotation);
+
   const geo = useMemo(
-    () => computeGeometry(boomLength, angle, rotation),
-    [boomLength, angle, rotation]
+    () => computeGeometry(boomLength, angle, rotation, angleRange),
+    [boomLength, angle, rotation, angleRange]
   );
   const { radius, hookHeight, minPossibleRadius, maxPossibleRadius } = geo;
 
@@ -69,6 +74,9 @@ export function useLiftAnalysis(inputs: LiftInputs): LiftAnalysis {
 
   return {
     ...geo,
+    angleRange,
+    slewRange,
+    sector,
     hookWeight,
     totalLoadKg,
     maxCapacityKg,

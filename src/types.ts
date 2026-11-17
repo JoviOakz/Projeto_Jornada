@@ -13,6 +13,20 @@ export interface ChartTM130 {
   capacities: Record<number, number>;
 }
 
+export interface AngleRange {
+  min: number;
+  max: number;
+}
+
+export interface SlewRange {
+  min: number;
+  max: number;
+  /** true = giro contínuo de 360° (sem batentes). */
+  continuous: boolean;
+}
+
+export type OperatingSector = 'FRONTAL' | 'LATERAL_TRASEIRA' | 'TRASEIRO_RESTRITO';
+
 /** Parâmetros controlados pelo operador. */
 export interface LiftInputs {
   model: CraneModel;
@@ -34,6 +48,11 @@ export interface LiftAnalysis {
   coordZ: number;
   minPossibleRadius: number;
   maxPossibleRadius: number;
+
+  // Limites operacionais do modelo
+  angleRange: AngleRange;
+  slewRange: SlewRange;
+  sector: OperatingSector;
 
   // Carga e capacidade
   hookWeight: number;
