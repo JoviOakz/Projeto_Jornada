@@ -708,3 +708,42 @@ body {
   .integrity-seal { background: #ffffff; color: #000000; border-color: #999999; }
   .integrity-copy, .integrity-verify { display: none !important; }
 }
+
+/* QR code e ações do selo */
+.integrity-main {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.integrity-qr {
+  width: 240px;
+  height: 240px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-radius: 6px;
+  image-rendering: pixelated;
+}
+
+.integrity-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.integrity-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .integrity-main { flex-direction: column; align-items: center; }
+}
+
+@media print {
+  .integrity-qr { width: 8cm; height: 8cm; }
+  .integrity-main { align-items: flex-start; }
+  .integrity-actions { display: none !important; }
+}

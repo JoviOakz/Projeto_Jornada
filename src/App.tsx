@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import './App.css';
 
 import type { LiftInputs, ViewMode } from './types';
@@ -11,6 +11,8 @@ import { ControlsPanel } from './components/ControlsPanel';
 import { TelemetryPanel } from './components/TelemetryPanel';
 import { ReportModal } from './components/ReportModal';
 import { StatusBar } from './components/StatusBar';
+import { VerifyModal } from './components/VerifyModal';
+import { readPackageFromHash } from './lib/integrity';
 
 const INITIAL_INPUTS: LiftInputs = {
   model: 'MD300L',
@@ -31,6 +33,20 @@ export const App: React.FC = () => {
   const [inputs, setInputs] = useState<LiftInputs>(INITIAL_INPUTS);
   const [viewMode, setViewMode] = useState<ViewMode>('3D');
   const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
+
+  // Link/QR de verificação: abre a tela de verificação com o pacote já carregado.
+  const [verifyText, setVerifyText] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : readPackageFromHash(window.location.hash)
+  );
+  useEffect(() => {
+    const onHash = () => setVerifyText(readPackageFromHash(window.location.hash));
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+  const closeVerify = () => {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    setVerifyText(null);
+  };
 
   // A extensão da lança só pode ser feita sem carga (catálogo MD 300L).
   const [extendedUnderLoad, setExtendedUnderLoad] = useState<boolean>(false);
@@ -101,6 +117,8 @@ export const App: React.FC = () => {
           <ControlsPanel inputs={inputs} analysis={analysis} onChange={updateInputs} />
         </aside>
       </main>
+
+      {verifyText !== null && <VerifyModal packageText={verifyText} onClose={closeVerify} />}
 
       {isReportOpen && (
         <ReportModal

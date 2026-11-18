@@ -55,7 +55,7 @@ export function buildReportPayload(
   tabelasHash: string
 ): ReportPayload {
   return {
-    app: 'Guindastes Ribas - Analise e Planejamento de Icamentos',
+    app: 'GuindastesRibas',
     versao: REPORT_VERSION,
     emitidoEm,
     tabelasHash,
@@ -74,10 +74,60 @@ export function buildReportPayload(
   };
 }
 
-/** Texto único (dados + selo) que o operador copia e guarda junto do relatório. */
-export async function buildSealedPackage(payload: ReportPayload): Promise<{ text: string; seal: string }> {
+/**
+ * Pacote (dados + selo). `text` é legível (para copiar e guardar);
+ * `compact` é a versão curta, usada no link e no QR code.
+ */
+export async function buildSealedPackage(
+  payload: ReportPayload
+): Promise<{ text: string; compact: string; seal: string }> {
   const seal = await sha256Hex(stableStringify(payload));
-  return { text: `${JSON.stringify(payload, null, 2)}\n${SEAL_MARKER}\n${seal}`, seal };
+  return {
+    text: `${JSON.stringify(payload, null, 2)}\n${SEAL_MARKER}\n${seal}`,
+    compact: `${JSON.stringify(payload)}\n${SEAL_MARKER}\n${seal}`,
+    seal
+  };
+}
+
+// ---- Link de verificação (os dados vão no fragmento "#", que o navegador nunca envia ao servidor) ----
+export const VERIFY_HASH_PREFIX = '#verificar=';
+
+function toBase64Url(text: string): string {
+  let bin = '';
+  new TextEncoder().encode(text).forEach((b) => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function fromBase64Url(encoded: string): string {
+  const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+
+export function makeVerificationLink(baseUrl: string, compactPackage: string): string {
+  return `${baseUrl}${VERIFY_HASH_PREFIX}${toBase64Url(compactPackage)}`;
+}
+
+/** Lê o pacote do fragmento da URL. null = não há link de verificação; '' = link inválido. */
+export function readPackageFromHash(hash: string): string | null {
+  if (!hash.startsWith(VERIFY_HASH_PREFIX)) return null;
+  try {
+    return fromBase64Url(hash.slice(VERIFY_HASH_PREFIX.length));
+  } catch {
+    return '';
+  }
+}
+
+/** Dados gravados no pacote, para exibir a quem verificou (não confiáveis até a verificação passar). */
+export function readRecordedPayload(packageText: string): ReportPayload | null {
+  const idx = packageText.lastIndexOf(SEAL_MARKER);
+  if (idx < 0) return null;
+  try {
+    const p = JSON.parse(packageText.slice(0, idx).trim());
+    return isPayload(p) ? p : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface VerificationCheck {
