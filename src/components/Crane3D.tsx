@@ -3,6 +3,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { LiftAnalysis, LiftInputs } from '../types';
 import { degToRad } from '../lib/geometry';
+import { padHits } from '../lib/sapatas';
+import { CARGO_HALF_SIZE_M, PAD_HALF_SIZE_M, VEHICLE_LAYOUT } from '../data/craneSpecs';
+import { computeBoomSegments } from '../lib/boom';
 
 interface Crane3DProps {
   inputs: LiftInputs;
@@ -13,274 +16,214 @@ interface Crane3DProps {
 // e só atualizar as poses dos objetos.
 export const Crane3D: React.FC<Crane3DProps> = ({ inputs, analysis }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
-
-  const { boomLength } = inputs;
-  const {
-    radius,
-    radAngle,
-    radRot,
-    minPossibleRadius,
-    maxPossibleRadius,
-    safeRadiusGround,
-    warningRadiusGround,
-    showOrangeZone,
-    isCargoOverSapata,
-    cableClipsIntoHaste,
-    statusColorHex,
-    slewRange
-  } = analysis;
-  const { min: slewMin, max: slewMax, continuous: slewContinuous } = slewRange;
+  const { model, boomLength, cableLength } = inputs;
+  const { radius, radAngle, radRot, zones, statusColorHex } = analysis;
 
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
+    const layout = VEHICLE_LAYOUT[model];
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x080c14);
 
     const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-    camera.position.set(22, 18, 28);
+    camera.position.set(36, 30, 44);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
     container.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.target.set(0, 3, 0);
+    controls.target.set(0, 7, 3);
 
-    // Luzes
     scene.add(new THREE.AmbientLight(0xffffff, 0.8));
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
     dirLight.position.set(30, 40, 20);
     scene.add(dirLight);
+    scene.add(new THREE.GridHelper(90, 90, 0x3b82f6, 0x1e293b));
 
-    // Grid de Chão
-    const gridHelper = new THREE.GridHelper(60, 60, 0x3b82f6, 0x1e293b);
-    scene.add(gridHelper);
-
-    // Setor angular dos anéis (360° ou setor restrito, ex.: TM130 traseiro 120°).
+    // --- ZONAS NO SOLO (um conjunto por setor; a área junto à base fica sem cor) ---
     // Azimute ψ (0° = +Z, cresce para +X) => ângulo do RingGeometry φ = 90° - ψ.
-    const ringStart = slewContinuous ? 0 : Math.PI / 2 - degToRad(slewMax);
-    const ringLength = slewContinuous ? Math.PI * 2 : degToRad(slewMax - slewMin);
-    const ringSegs = Math.max(8, Math.round((64 * ringLength) / (Math.PI * 2)));
+    const zoneGroup = new THREE.Group();
+    zoneGroup.position.y = 0.02;
+    scene.add(zoneGroup);
 
-    // --- ANÉIS TRANSLÚCIDOS DE RAIO NO SOLO (VERDE, LARANJA E VERMELHO) ---
-    const groundZoneGroup = new THREE.Group();
-    groundZoneGroup.position.set(0, 0.02, -1); // Alinhado com o centro do pino de giro
-    scene.add(groundZoneGroup);
-
-    const zoneMaterial = (color: number) =>
-      new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0.28,
-        side: THREE.DoubleSide,
-        depthWrite: false
-      });
-
-    const greenMat = zoneMaterial(0x10b981);  // Operação segura
-    const orangeMat = zoneMaterial(0xf97316); // Zona crítica
-    const redMat = zoneMaterial(0xef4444);    // Sobrecarga / reprovado
-
-    // Zona Verde (Segura)
-    const greenGeo = new THREE.RingGeometry(minPossibleRadius, safeRadiusGround, ringSegs, 1, ringStart, ringLength);
-    const greenRingMesh = new THREE.Mesh(greenGeo, greenMat);
-    greenRingMesh.rotation.x = Math.PI / 2;
-    greenRingMesh.name = 'greenRing';
-    groundZoneGroup.add(greenRingMesh);
-
-    // Zona Laranja (entre safeRadius e warningRadius)
-    if (showOrangeZone) {
-      const orangeGeo = new THREE.RingGeometry(
-        Math.max(minPossibleRadius, safeRadiusGround),
-        warningRadiusGround,
-        ringSegs,
-        1,
-        ringStart,
-        ringLength
+    const addRing = (r0: number, r1: number, startDeg: number, endDeg: number, color: number, opacity: number) => {
+      if (r1 - r0 < 0.02) return;
+      const len = degToRad(endDeg - startDeg);
+      const segs = Math.max(8, Math.round((64 * len) / (Math.PI * 2)));
+      const mesh = new THREE.Mesh(
+        new THREE.RingGeometry(r0, r1, segs, 1, Math.PI / 2 - degToRad(endDeg), len),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false })
       );
-      const orangeRingMesh = new THREE.Mesh(orangeGeo, orangeMat);
-      orangeRingMesh.rotation.x = Math.PI / 2;
-      orangeRingMesh.name = 'orangeRing';
-      groundZoneGroup.add(orangeRingMesh);
-    }
+      mesh.rotation.x = Math.PI / 2;
+      zoneGroup.add(mesh);
+    };
 
-    // Zona Vermelha (Sobrecarga)
-    const redGeo = new THREE.RingGeometry(
-      Math.max(minPossibleRadius, warningRadiusGround),
-      maxPossibleRadius,
-      ringSegs,
-      1,
-      ringStart,
-      ringLength
-    );
-    const redRingMesh = new THREE.Mesh(redGeo, redMat);
-    redRingMesh.rotation.x = Math.PI / 2;
-    redRingMesh.name = 'redRing';
-    groundZoneGroup.add(redRingMesh);
-
-    // Linha do raio atual no chão
-    const currentRadiusLineGeo = new THREE.RingGeometry(radius - 0.08, radius + 0.08, ringSegs, 1, ringStart, ringLength);
-    const currentRadiusLineMat = new THREE.MeshBasicMaterial({
-      color: statusColorHex,
-      side: THREE.DoubleSide
+    zones.forEach((z) => {
+      addRing(z.minR, z.safeR, z.startDeg, z.endDeg, 0x10b981, 0.28);
+      if (z.showOrange) addRing(z.safeR, z.warnR, z.startDeg, z.endDeg, 0xf97316, 0.28);
+      addRing(Math.max(z.minR, z.warnR), z.maxR, z.startDeg, z.endDeg, 0xef4444, 0.28);
     });
-    const currentRadiusMesh = new THREE.Mesh(currentRadiusLineGeo, currentRadiusLineMat);
-    currentRadiusMesh.rotation.x = Math.PI / 2;
-    currentRadiusMesh.name = 'currentRadiusLine';
-    groundZoneGroup.add(currentRadiusMesh);
 
-    // --- ESTRUTURA 3D DO GUINDASTE ---
+    // Anel do raio atual (no setor ativo)
+    const activeZone = analysis.activeZone;
+    const lineLen = degToRad(activeZone.endDeg - activeZone.startDeg);
+    const currentRadiusMat = new THREE.MeshBasicMaterial({ color: statusColorHex, side: THREE.DoubleSide });
+    const currentRadiusMesh = new THREE.Mesh(
+      new THREE.RingGeometry(radius - 0.08, radius + 0.08, 96, 1, Math.PI / 2 - degToRad(activeZone.endDeg), lineLen),
+      currentRadiusMat
+    );
+    currentRadiusMesh.rotation.x = Math.PI / 2;
+    zoneGroup.add(currentRadiusMesh);
+
+    // --- VEÍCULO (origem = eixo de giro) ---
     const craneGroup = new THREE.Group();
     scene.add(craneGroup);
 
-    // Indicador de perigo: carga sobre a sapata
-    if (isCargoOverSapata) {
-      const sapataWarningMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(8.2, 0.15, 0.8),
-        new THREE.MeshBasicMaterial({ color: 0xff0000 })
-      );
-      sapataWarningMesh.position.set(0, 0.5, -2);
-      sapataWarningMesh.name = 'sapataWarning';
-      craneGroup.add(sapataWarningMesh);
-    }
-
-    // Indicador de perigo: cabo atravessando a haste
-    if (cableClipsIntoHaste) {
-      const cableWarningMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.5, 0.5, boomLength * 0.3),
-        new THREE.MeshBasicMaterial({ color: 0xff6600 })
-      );
-      cableWarningMesh.position.set(0, 0.5, boomLength * 0.15);
-      cableWarningMesh.name = 'cableWarning';
-      craneGroup.add(cableWarningMesh);
-    }
-
-    // Chassi
+    const chassisLen = layout.cabStartZ - layout.rearZ;
     const chassis = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 1.2, 8),
+      new THREE.BoxGeometry(layout.bodyHalfWidth * 2, 1.0, chassisLen),
       new THREE.MeshStandardMaterial({ color: 0x334155 })
     );
-    chassis.position.y = 1;
-    chassis.castShadow = true;
+    chassis.position.set(0, 1.1, (layout.cabStartZ + layout.rearZ) / 2);
     craneGroup.add(chassis);
 
-    // Cabine
     const cab = new THREE.Mesh(
-      new THREE.BoxGeometry(3.8, 1.8, 2.2),
+      new THREE.BoxGeometry(layout.bodyHalfWidth * 2 - 0.1, 1.9, layout.frontZ - layout.cabStartZ),
       new THREE.MeshStandardMaterial({ color: 0x1e293b })
     );
-    cab.position.set(0, 2.3, 2.8);
-    cab.castShadow = true;
+    cab.position.set(0, 1.9, (layout.frontZ + layout.cabStartZ) / 2);
     craneGroup.add(cab);
 
-    // Sapatas estabilizadoras
-    const outMat = new THREE.MeshStandardMaterial({ color: 0x64748b });
-    const outFront = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 0.6), outMat);
-    outFront.position.set(0, 0.4, 2);
-    outFront.castShadow = true;
-    const outRear = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 0.6), outMat);
-    outRear.position.set(0, 0.4, -2);
-    outRear.castShadow = true;
-    craneGroup.add(outFront, outRear);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+    layout.axlesZ.forEach((az) => {
+      [-1, 1].forEach((side) => {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.4, 20), wheelMat);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(side * (layout.bodyHalfWidth - 0.1), 0.55, az);
+        craneGroup.add(wheel);
+      });
+    });
+
+    // Patolas e sapatas (bases de apoio no chão)
+    const hits = padHits(model, radius, radRot);
+    const beamMat = new THREE.MeshStandardMaterial({ color: 0x64748b });
+    layout.pads.forEach((pad, i) => {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(pad.x) - layout.bodyHalfWidth, 0.25, 0.4), beamMat);
+      beam.position.set(pad.x / 2 + (Math.sign(pad.x) * layout.bodyHalfWidth) / 2, 0.9, pad.z);
+      craneGroup.add(beam);
+
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.8, 0.25), beamMat);
+      post.position.set(pad.x, 0.45, pad.z);
+      craneGroup.add(post);
+
+      const padMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(PAD_HALF_SIZE_M * 2, 0.12, PAD_HALF_SIZE_M * 2),
+        new THREE.MeshStandardMaterial({ color: hits[i] ? 0xef4444 : 0x94a3b8 })
+      );
+      padMesh.position.set(pad.x, 0.06, pad.z);
+      craneGroup.add(padMesh);
+
+      // Área proibida para a carga (passar ou descer sobre a sapata)
+      const side = (PAD_HALF_SIZE_M + CARGO_HALF_SIZE_M) * 2;
+      const keepOut = new THREE.Mesh(
+        new THREE.PlaneGeometry(side, side),
+        new THREE.MeshBasicMaterial({
+          color: 0xef4444, transparent: true, opacity: hits[i] ? 0.55 : 0.22,
+          side: THREE.DoubleSide, depthWrite: false
+        })
+      );
+      keepOut.rotation.x = -Math.PI / 2;
+      keepOut.position.set(pad.x, 0.04, pad.z);
+      craneGroup.add(keepOut);
+    });
 
     // Mesa de giro (rotação 360°)
     const slewingGroup = new THREE.Group();
-    slewingGroup.position.set(0, 1.8, -1);
+    slewingGroup.position.set(0, 1.8, 0);
     craneGroup.add(slewingGroup);
-
-    const baseTurret = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.8, 1.8, 0.6, 24),
+    slewingGroup.add(new THREE.Mesh(
+      new THREE.CylinderGeometry(1.4, 1.4, 0.6, 24),
       new THREE.MeshStandardMaterial({ color: 0x475569 })
-    );
-    baseTurret.castShadow = true;
-    slewingGroup.add(baseTurret);
+    ));
 
-    // Pivô de elevação da lança
     const boomPivotGroup = new THREE.Group();
-    boomPivotGroup.position.set(0, 0.5, 0);
+    boomPivotGroup.position.set(0, 0.7, 0);
     slewingGroup.add(boomPivotGroup);
 
-    // Lança telescópica
     const boomMat = new THREE.MeshStandardMaterial({ color: statusColorHex, roughness: 0.3 });
-    const baseBoomGeo = new THREE.BoxGeometry(0.8, 0.8, boomLength);
-    baseBoomGeo.translate(0, 0, boomLength / 2);
-    const boomMesh = new THREE.Mesh(baseBoomGeo, boomMat);
-    boomMesh.castShadow = true;
-    boomPivotGroup.add(boomMesh);
+    // Lança telescópica: seção-base + seções que deslizam para fora, cada uma mais fina.
+    const SECTION_WIDTHS = [0.95, 0.8, 0.66, 0.52];
+    const collarMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+    computeBoomSegments(model, boomLength).forEach((seg) => {
+      const w = SECTION_WIDTHS[Math.min(seg.index, SECTION_WIDTHS.length - 1)];
+      const geo = new THREE.BoxGeometry(w, w, seg.length);
+      geo.translate(0, 0, seg.start + seg.length / 2);
+      boomPivotGroup.add(new THREE.Mesh(geo, boomMat));
+      if (seg.index > 0) {
+        // Colar na junção entre as seções (mostra a divisão)
+        const cw = SECTION_WIDTHS[seg.index - 1] + 0.1;
+        const cg = new THREE.BoxGeometry(cw, cw, 0.22);
+        cg.translate(0, 0, seg.start);
+        boomPivotGroup.add(new THREE.Mesh(cg, collarMat));
+      }
+    });
 
-    // Cabo de aço
-    const cableMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8 });
     const cableGeo = new THREE.BufferGeometry();
-    const cableLine = new THREE.Line(cableGeo, cableMat);
+    const cableLine = new THREE.Line(cableGeo, new THREE.MeshBasicMaterial({ color: 0x94a3b8 }) as unknown as THREE.LineBasicMaterial);
     scene.add(cableLine);
 
-    // Bloco de carga
     const payloadMat = new THREE.MeshStandardMaterial({ color: statusColorHex });
-    const payloadMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), payloadMat);
-    payloadMesh.castShadow = true;
+    const payloadMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(CARGO_HALF_SIZE_M * 2, CARGO_HALF_SIZE_M * 2, CARGO_HALF_SIZE_M * 2),
+      payloadMat
+    );
     scene.add(payloadMesh);
 
-    let animationId = 0;
+    slewingGroup.rotation.y = radRot;
+    boomPivotGroup.rotation.x = -radAngle;
 
+    const onResize = () => {
+      if (!container.clientWidth || !container.clientHeight) return;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    };
+    window.addEventListener('resize', onResize);
+
+    let animationId = 0;
     const animate = () => {
       animationId = requestAnimationFrame(animate);
-
-      // Giro de azimute (eixo Y) e elevação da lança (eixo X)
-      slewingGroup.rotation.y = radRot;
-      boomPivotGroup.rotation.x = -radAngle;
-
-      // Sincronizar cores com o status
-      boomMat.color.setHex(statusColorHex);
-      payloadMat.color.setHex(statusColorHex);
-      currentRadiusLineMat.color.setHex(statusColorHex);
-
-      // Ponta da lança em coordenadas globais
+      scene.updateMatrixWorld(true);
       const tipWorld = new THREE.Vector3(0, 0, boomLength);
-      boomMesh.localToWorld(tipWorld);
-
-      // Carga suspensa
-      const payloadPos = new THREE.Vector3(tipWorld.x, Math.max(1, tipWorld.y - 4), tipWorld.z);
-      payloadMesh.position.copy(payloadPos);
-
-      cableGeo.setFromPoints([tipWorld, payloadPos]);
-
+      boomPivotGroup.localToWorld(tipWorld);
+      // Carga pendurada no cabo; se o cabo passa do solo, ela fica apoiada no chão.
+      payloadMesh.position.set(tipWorld.x, Math.max(CARGO_HALF_SIZE_M, tipWorld.y - cableLength), tipWorld.z);
+      cableGeo.setFromPoints([tipWorld, payloadMesh.position]);
       controls.update();
       renderer.render(scene, camera);
     };
-
     animate();
 
     return () => {
       cancelAnimationFrame(animationId);
+      window.removeEventListener('resize', onResize);
+      controls.dispose();
+      scene.traverse((obj) => {
+        const m = obj as THREE.Mesh;
+        m.geometry?.dispose?.();
+        const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+        if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+        else mat?.dispose?.();
+      });
       renderer.dispose();
-      greenGeo.dispose();
-      redGeo.dispose();
-      currentRadiusLineGeo.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
-      }
+      if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
     };
-  }, [
-    boomLength,
-    radius,
-    radAngle,
-    radRot,
-    minPossibleRadius,
-    maxPossibleRadius,
-    safeRadiusGround,
-    warningRadiusGround,
-    showOrangeZone,
-    isCargoOverSapata,
-    cableClipsIntoHaste,
-    statusColorHex,
-    slewMin,
-    slewMax,
-    slewContinuous
-  ]);
+  }, [model, boomLength, cableLength, radius, radAngle, radRot, zones, statusColorHex, analysis.activeZone]);
 
   return <div className="canvas-wrapper-3d" ref={mountRef} />;
 };

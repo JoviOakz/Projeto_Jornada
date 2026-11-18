@@ -4,42 +4,48 @@ import './App.css';
 import type { LiftInputs, ViewMode } from './types';
 import { useLiftAnalysis } from './hooks/useLiftAnalysis';
 import { normalizeInputs } from './lib/limits';
+import { isLoadAirborne } from './lib/geometry';
 import { Crane3D } from './components/Crane3D';
 import { Crane2D } from './components/Crane2D';
 import { ControlsPanel } from './components/ControlsPanel';
 import { TelemetryPanel } from './components/TelemetryPanel';
-import { LoadChartTable } from './components/LoadChartTable';
 import { ReportModal } from './components/ReportModal';
+import { StatusBar } from './components/StatusBar';
 
 const INITIAL_INPUTS: LiftInputs = {
   model: 'MD300L',
   boomLength: 17.7,
-  payloadKg: 8000,
+  payloadKg: 1000,
   angle: 45,
-  rotation: 45
+  rotation: 90,
+  cableLength: 4
 };
 
 const VIEW_TABS: { mode: ViewMode; label: string }[] = [
-  { mode: '3D', label: '🌐 Visão 3D WebGL (Com Zonas no Chão)' },
-  { mode: '2D_SIDE', label: '📐 2D Vista Lateral' },
-  { mode: '2D_TOP', label: '🔍 2D Vista Superior (Planta)' }
+  { mode: '3D', label: '🌐 3D' },
+  { mode: '2D_SIDE', label: '📐 Lateral' },
+  { mode: '2D_TOP', label: '🔍 Planta' }
 ];
-
-const VIEW_HINTS: Record<ViewMode, string> = {
-  '3D': '🟢 Verde = Operação Permitida | 🔴 Vermelho = Sobrecarga',
-  '2D_SIDE': '📐 Elevação da Lança',
-  '2D_TOP': '🔍 Planta de Raio no Solo'
-};
 
 export const App: React.FC = () => {
   const [inputs, setInputs] = useState<LiftInputs>(INITIAL_INPUTS);
   const [viewMode, setViewMode] = useState<ViewMode>('3D');
   const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
 
+  // A extensão da lança só pode ser feita sem carga (catálogo MD 300L).
+  const [extendedUnderLoad, setExtendedUnderLoad] = useState<boolean>(false);
+
   const updateInputs = useCallback(
-    (patch: Partial<LiftInputs>) =>
-      setInputs((prev) => normalizeInputs({ ...prev, ...patch }, prev.model)),
-    []
+    (patch: Partial<LiftInputs>) => {
+      const next = normalizeInputs({ ...inputs, ...patch }, inputs.model);
+      const lengthChanged = next.model === inputs.model && next.boomLength !== inputs.boomLength;
+      const wasAirborne = isLoadAirborne(inputs.boomLength, inputs.angle, inputs.cableLength);
+      const nowAirborne = isLoadAirborne(next.boomLength, next.angle, next.cableLength);
+      if (lengthChanged) setExtendedUnderLoad(wasAirborne);
+      else if (!nowAirborne) setExtendedUnderLoad(false);
+      setInputs(next);
+    },
+    [inputs]
   );
 
   const analysis = useLiftAnalysis(inputs);
@@ -62,51 +68,45 @@ export const App: React.FC = () => {
         </div>
       </header>
 
+      <StatusBar analysis={analysis} extendedUnderLoad={extendedUnderLoad} />
+
       <main className="main-content">
-        {/* Painel Gráfico */}
-        <section className="canvas-card">
-          <div className="card-header">
-            <div className="view-tabs">
-              {VIEW_TABS.map(({ mode, label }) => (
-                <button
-                  key={mode}
-                  className={viewMode === mode ? 'active' : ''}
-                  onClick={() => setViewMode(mode)}
-                >
-                  {label}
-                </button>
-              ))}
+        <div className="main-column">
+          <section className="canvas-card">
+            <div className="card-header">
+              <div className="view-tabs">
+                {VIEW_TABS.map(({ mode, label }) => (
+                  <button
+                    key={mode}
+                    className={viewMode === mode ? 'active' : ''}
+                    onClick={() => setViewMode(mode)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <span className="instruction-badge">{VIEW_HINTS[viewMode]}</span>
-          </div>
 
-          {viewMode === '3D' ? (
-            <Crane3D inputs={inputs} analysis={analysis} />
-          ) : (
-            <Crane2D view={viewMode} inputs={inputs} analysis={analysis} />
-          )}
-        </section>
+            {viewMode === '3D' ? (
+              <Crane3D inputs={inputs} analysis={analysis} />
+            ) : (
+              <Crane2D view={viewMode} inputs={inputs} analysis={analysis} />
+            )}
+          </section>
 
-        {/* Sidebar */}
-        <section className="controls-sidebar">
-          <ControlsPanel inputs={inputs} onChange={updateInputs} />
-          <TelemetryPanel analysis={analysis} />
-        </section>
+          <TelemetryPanel analysis={analysis} extendedUnderLoad={extendedUnderLoad} />
+        </div>
+
+        <aside className="controls-sidebar">
+          <ControlsPanel inputs={inputs} analysis={analysis} onChange={updateInputs} />
+        </aside>
       </main>
-
-      <LoadChartTable
-        model={inputs.model}
-        boomLength={inputs.boomLength}
-        angle={inputs.angle}
-        radius={analysis.radius}
-        isOverload={analysis.isOverload}
-        isWarning={analysis.isWarning}
-      />
 
       {isReportOpen && (
         <ReportModal
           inputs={inputs}
           analysis={analysis}
+          extendedUnderLoad={extendedUnderLoad}
           onClose={() => setIsReportOpen(false)}
         />
       )}

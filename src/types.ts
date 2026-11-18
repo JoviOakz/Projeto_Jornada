@@ -1,6 +1,7 @@
 export type CraneModel = 'MD300L' | 'TM130';
 export type ViewMode = '3D' | '2D_SIDE' | '2D_TOP';
 export type View2D = Exclude<ViewMode, '3D'>;
+export type OperatingSector = 'FRONTAL' | 'LATERAL_TRASEIRA' | 'TRASEIRO_RESTRITO';
 
 export interface ChartMD300L {
   radii: number[];
@@ -25,7 +26,41 @@ export interface SlewRange {
   continuous: boolean;
 }
 
-export type OperatingSector = 'FRONTAL' | 'LATERAL_TRASEIRA' | 'TRASEIRO_RESTRITO';
+/** Setor de giro (azimute em graus; 0° = sobre a cabine, horário). Pode ter início negativo. */
+export interface SectorDef {
+  id: OperatingSector;
+  startDeg: number;
+  endDeg: number;
+}
+
+/** Posição de uma sapata no solo, relativa ao eixo de giro (x = lateral, z = frente). */
+export interface PadPosition {
+  x: number;
+  z: number;
+}
+
+export interface VehicleLayout {
+  bodyHalfWidth: number;
+  frontZ: number;
+  rearZ: number;
+  cabStartZ: number;
+  axlesZ: number[];
+  pads: PadPosition[];
+  /** true = medidas provisórias (não vieram de desenho do fabricante). */
+  estimated: boolean;
+}
+
+/** Zonas no solo de um setor: verde [minR, safeR], laranja [safeR, warnR], vermelha [warnR, maxR]. */
+export interface ZoneSet {
+  sector: OperatingSector;
+  startDeg: number;
+  endDeg: number;
+  minR: number;
+  safeR: number;
+  warnR: number;
+  maxR: number;
+  showOrange: boolean;
+}
 
 /** Parâmetros controlados pelo operador. */
 export interface LiftInputs {
@@ -34,6 +69,7 @@ export interface LiftInputs {
   payloadKg: number;  // kg
   angle: number;      // ° de elevação
   rotation: number;   // ° de azimute
+  cableLength: number; // m de cabo desenrolado (da ponta da lança até o centro da carga)
 }
 
 /** Tudo que é derivado dos inputs (telemetria, capacidade, status, zonas). */
@@ -54,6 +90,13 @@ export interface LiftAnalysis {
   slewRange: SlewRange;
   sector: OperatingSector;
 
+  /** Comprimento da tabela de carga usada (próximo comprimento tabelado, MD300L). */
+  tableLength: number | null;
+
+  // Posição da carga
+  loadHeight: number;
+  isLoadAirborne: boolean;
+
   // Carga e capacidade
   hookWeight: number;
   totalLoadKg: number;
@@ -65,13 +108,13 @@ export interface LiftAnalysis {
   isOverload: boolean;
   isDanger: boolean;
   isWarning: boolean;
-  /** Aprovado = utilização abaixo do limite normativo (RN01). */
+  /** Aprovado = utilização abaixo do limite normativo (RN01) E carga fora das sapatas. */
   isApproved: boolean;
 
-  // Zonas no solo
+  // Zonas no solo (uma por setor) e a do setor atual
+  zones: ZoneSet[];
+  activeZone: ZoneSet;
   safeRadiusGround: number;
-  warningRadiusGround: number;
-  showOrangeZone: boolean;
 
   // Riscos físicos
   isCargoOverSapata: boolean;

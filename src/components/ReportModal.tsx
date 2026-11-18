@@ -6,11 +6,12 @@ import { SECTOR_LABELS } from '../lib/limits';
 interface ReportModalProps {
   inputs: LiftInputs;
   analysis: LiftAnalysis;
+  extendedUnderLoad: boolean;
   onClose: () => void;
 }
 
-export const ReportModal: React.FC<ReportModalProps> = ({ inputs, analysis, onClose }) => {
-  const { model, boomLength, angle, rotation } = inputs;
+export const ReportModal: React.FC<ReportModalProps> = ({ inputs, analysis, extendedUnderLoad, onClose }) => {
+  const { model, boomLength, angle, rotation, cableLength } = inputs;
   const {
     radius,
     hookHeight,
@@ -23,13 +24,22 @@ export const ReportModal: React.FC<ReportModalProps> = ({ inputs, analysis, onCl
     usagePct,
     isOverload,
     isApproved,
-    sector
+    isCargoOverSapata,
+    sector,
+    tableLength,
+    loadHeight,
+    isLoadAirborne
   } = analysis;
+  const approved = isApproved && !extendedUnderLoad;
 
   // RN01: acima de 85% a operação é reprovada.
   const statusLabel = isOverload
     ? 'REPROVADO / SOBRECARGA'
-    : isApproved
+    : isCargoOverSapata
+    ? 'REPROVADO / CARGA SOBRE SAPATA'
+    : extendedUnderLoad
+    ? 'REPROVADO / LANÇA ESTENDIDA COM CARGA'
+    : approved
     ? 'APROVADO COM SEGURANÇA'
     : `REPROVADO / ACIMA DE ${NORMATIVE_LIMIT_PCT}% (RN01)`;
 
@@ -45,20 +55,22 @@ export const ReportModal: React.FC<ReportModalProps> = ({ inputs, analysis, onCl
           <p><strong>Equipamento Selecionado:</strong> {model === 'MD300L' ? 'Madal Palfinger MD 300L' : 'Luna TM 130'}</p>
           <hr />
           <div className="report-grid">
-            <div><strong>Comprimento da Lança:</strong> {boomLength} m</div>
+            <div><strong>Comprimento da Lança:</strong> {boomLength.toFixed(1)} m</div>
+            {tableLength !== null && <div><strong>Tabela de Carga Usada:</strong> {tableLength.toFixed(1)} m</div>}
             <div><strong>Ângulo de Elevação:</strong> {angle}°</div>
             <div><strong>Giro de Azimute:</strong> {rotation}°</div>
             <div><strong>Setor de Operação:</strong> {SECTOR_LABELS[sector]}</div>
             <div><strong>Raio de Operação:</strong> {radius} m</div>
             <div><strong>Raio Máximo Seguro no Solo:</strong> {safeRadiusGround.toFixed(1)} m</div>
-            <div><strong>Altura do Gancho:</strong> {hookHeight} m</div>
+            <div><strong>Altura da Ponta da Lança:</strong> {hookHeight} m</div>
+            <div><strong>Cabo / Altura da Carga:</strong> {cableLength.toFixed(1)} m / {isLoadAirborne ? `${loadHeight.toFixed(1)} m` : 'no solo'}</div>
             <div><strong>Coordenadas 3D:</strong> X={coordX}m, Y={coordY}m, Z={coordZ}m</div>
             <div><strong>Carga Suspensa Total:</strong> {totalLoadKg.toLocaleString()} kg</div>
             <div><strong>Capacidade Máxima Permitida:</strong> {maxCapacityKg ? `${maxCapacityKg.toLocaleString()} kg` : 'N/A'}</div>
-            <div><strong>Taxa de Utilização:</strong> {usagePct}%</div>
+            <div><strong>Taxa de Utilização:</strong> {usagePct.toFixed(1)}%</div>
           </div>
           <hr />
-          <div className={`status-box ${isApproved ? 'status-green' : 'status-red'}`}>
+          <div className={`status-box ${approved ? 'status-green' : 'status-red'}`}>
             STATUS FINAL DE OPERAÇÃO: {statusLabel}
           </div>
         </div>

@@ -1,21 +1,13 @@
 import { useMemo } from 'react';
 import type { LiftAnalysis, LiftInputs } from '../types';
-import { computeGeometry } from '../lib/geometry';
+import { computeGeometry, isLoadAirborne, loadCenterHeight } from '../lib/geometry';
+import { tableLengthFor } from '../data/charts';
 import { getAngleRange, getOperatingSector, getSlewRange } from '../lib/limits';
-import {
-  HOOK_WEIGHT_KG,
-  NORMATIVE_LIMIT_PCT,
-  computeSafeRadiusGround,
-  computeWarningRadiusGround,
-  getMaxCapacityKg
-} from '../lib/capacity';
-
-// Validação: carga acima das sapatas do guindaste
-// TODO: regra atualmente inalcançável (hookHeight nunca fica < 2 m).
-const SAPATA_HALF_WIDTH_M = 4;
+import { isCargoOverSapata } from '../lib/sapatas';
+import { HOOK_WEIGHT_KG, NORMATIVE_LIMIT_PCT, computeZones, getMaxCapacityKg } from '../lib/capacity';
 
 export function useLiftAnalysis(inputs: LiftInputs): LiftAnalysis {
-  const { model, boomLength, payloadKg, angle, rotation } = inputs;
+  const { model, boomLength, payloadKg, angle, rotation, cableLength } = inputs;
 
   const angleRange = useMemo(() => getAngleRange(model, boomLength), [model, boomLength]);
   const slewRange = getSlewRange(model);
@@ -25,73 +17,57 @@ export function useLiftAnalysis(inputs: LiftInputs): LiftAnalysis {
     () => computeGeometry(boomLength, angle, rotation, angleRange),
     [boomLength, angle, rotation, angleRange]
   );
-  const { radius, hookHeight, minPossibleRadius, maxPossibleRadius } = geo;
+  const { radius, hookHeight, radRot, minPossibleRadius, maxPossibleRadius } = geo;
+
+  const tableLength = model === 'MD300L' ? tableLengthFor(boomLength) : null;
+  const loadHeight = loadCenterHeight(hookHeight, cableLength);
+  const airborne = isLoadAirborne(boomLength, angle, cableLength);
 
   const hookWeight = HOOK_WEIGHT_KG[model];
   const totalLoadKg = payloadKg + hookWeight;
 
   const maxCapacityKg = useMemo(
-    () => getMaxCapacityKg(model, boomLength, radius, angle),
-    [model, boomLength, radius, angle]
+    () => getMaxCapacityKg(model, sector, boomLength, radius, angle),
+    [model, sector, boomLength, radius, angle]
   );
 
   const isOutOfChart = maxCapacityKg === null;
-  const usagePct = maxCapacityKg ? Math.round((totalLoadKg / maxCapacityKg) * 100) : 100;
+  // Sem arredondar: 100,4% precisa contar como sobrecarga.
+  const usagePct = maxCapacityKg ? (totalLoadKg / maxCapacityKg) * 100 : 100;
 
   const isOverload = isOutOfChart || usagePct > 100;
-  const isDanger =
-    !isOverload && usagePct >= NORMATIVE_LIMIT_PCT && usagePct <= 100;
-  const isWarning = !isOverload && usagePct >= NORMATIVE_LIMIT_PCT;
-  const isApproved = !isOverload && !isWarning;
+  const isDanger = !isOverload && usagePct >= NORMATIVE_LIMIT_PCT;
+  const isWarning = isDanger;
 
-  const safeRadiusGround = useMemo(
-    () => computeSafeRadiusGround({
-      model, boomLength, totalLoadKg, minR: minPossibleRadius, maxR: maxPossibleRadius
-    }),
+  const isOverSapata = isCargoOverSapata(model, radius, radRot);
+  // RN01: reprovado a partir de 85%; carga sobre sapata também reprova.
+  const isApproved = !isOverload && !isWarning && !isOverSapata;
+
+  const zones = useMemo(
+    () => computeZones({ model, boomLength, totalLoadKg, minR: minPossibleRadius, maxR: maxPossibleRadius }),
     [model, boomLength, totalLoadKg, minPossibleRadius, maxPossibleRadius]
   );
+  const activeZone = zones.find((z) => z.sector === sector) ?? zones[0];
 
-  const warningRadiusGround = useMemo(
-    () => computeWarningRadiusGround({
-      model, boomLength, totalLoadKg, minR: minPossibleRadius, maxR: maxPossibleRadius
-    }),
-    [model, boomLength, totalLoadKg, minPossibleRadius, maxPossibleRadius]
-  );
-
-  const showOrangeZone = safeRadiusGround < warningRadiusGround;
-
-  const isCargoOverSapata = radius < SAPATA_HALF_WIDTH_M && hookHeight < 2;
   // TODO: regra quase inalcançável com a geometria atual.
   const cableClipsIntoHaste = angle > 60 && radius < 1.5;
 
   const { statusColorHex, statusColorCSS } = useMemo(() => {
-    if (isOutOfChart) return { statusColorHex: 0x64748b, statusColorCSS: '#64748b' }; // Cinza
-    if (isOverload) return { statusColorHex: 0xef4444, statusColorCSS: '#ef4444' };   // Vermelho
-    if (isDanger) return { statusColorHex: 0xf97316, statusColorCSS: '#f97316' };     // Laranja
-    if (isWarning) return { statusColorHex: 0xf59e0b, statusColorCSS: '#f59e0b' };    // Âmbar
-    return { statusColorHex: 0x10b981, statusColorCSS: '#10b981' };                   // Verde
-  }, [isOutOfChart, isOverload, isDanger, isWarning]);
+    if (isOutOfChart) return { statusColorHex: 0x64748b, statusColorCSS: '#64748b' };
+    if (isOverload) return { statusColorHex: 0xef4444, statusColorCSS: '#ef4444' };
+    if (isDanger || isOverSapata) return { statusColorHex: 0xf97316, statusColorCSS: '#f97316' };
+    return { statusColorHex: 0x10b981, statusColorCSS: '#10b981' };
+  }, [isOutOfChart, isOverload, isDanger, isOverSapata]);
 
   return {
     ...geo,
-    angleRange,
-    slewRange,
-    sector,
-    hookWeight,
-    totalLoadKg,
-    maxCapacityKg,
-    usagePct,
-    isOutOfChart,
-    isOverload,
-    isDanger,
-    isWarning,
-    isApproved,
-    safeRadiusGround,
-    warningRadiusGround,
-    showOrangeZone,
-    isCargoOverSapata,
+    angleRange, slewRange, sector,
+    tableLength, loadHeight, isLoadAirborne: airborne,
+    hookWeight, totalLoadKg, maxCapacityKg, usagePct,
+    isOutOfChart, isOverload, isDanger, isWarning, isApproved,
+    zones, activeZone, safeRadiusGround: activeZone.safeR,
+    isCargoOverSapata: isOverSapata,
     cableClipsIntoHaste,
-    statusColorHex,
-    statusColorCSS
+    statusColorHex, statusColorCSS
   };
 }

@@ -1,9 +1,15 @@
 import type { ChartMD300L, ChartTM130 } from '../types';
 
-// Tabela Oficial Madal Palfinger MD 300L (em kgf)
-export const CHART_MD300L: ChartMD300L = {
-  radii: [3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0],
-  lengths: [10.5, 14.1, 17.7, 21.3, 24.9, 28.5, 32.1],
+// Tabela Oficial Madal Palfinger MD 300L — "Regime de Cargas", sapatas com extensão máxima.
+// Valores em kgf, já com 85% de tombamento e incluindo o gancho principal (235 kg).
+// Fonte: catálogo oficial Madal Palfinger MD 300L (página "Regime de Cargas").
+const RADII = [3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0];
+export const MD300L_LENGTHS = [10.5, 14.1, 17.7, 21.3, 24.9, 28.5, 32.1];
+
+// ÁREA FRONTAL (110° sobre a cabine)
+const MD300L_FRONTAL: ChartMD300L = {
+  radii: RADII,
+  lengths: MD300L_LENGTHS,
   matrix: {
     10.5: { 3.0: 30000, 3.5: 25000, 4.0: 22900, 4.5: 21000, 5.0: 19200, 6.0: 15500, 7.0: 10500, 8.0: 8000, 9.0: 5500 },
     14.1: { 3.0: 20000, 3.5: 20000, 4.0: 20000, 4.5: 20000, 5.0: 18000, 6.0: 14500, 7.0: 11500, 8.0: 8000, 9.0: 5800, 10.0: 4500, 12.0: 2700 },
@@ -15,6 +21,26 @@ export const CHART_MD300L: ChartMD300L = {
   }
 };
 
+// ÁREAS LATERAL E TRASEIRA (250°)
+const MD300L_LATERAL: ChartMD300L = {
+  radii: RADII,
+  lengths: MD300L_LENGTHS,
+  matrix: {
+    10.5: { 3.0: 30000, 3.5: 25000, 4.0: 22900, 4.5: 21000, 5.0: 19300, 6.0: 16000, 7.0: 13600, 8.0: 11300 },
+    14.1: { 3.0: 20000, 3.5: 20000, 4.0: 20000, 4.5: 20000, 5.0: 18400, 6.0: 15300, 7.0: 12600, 8.0: 10500, 9.0: 8650, 10.0: 7100, 12.0: 4900 },
+    17.7: { 3.0: 16000, 3.5: 16000, 4.0: 16000, 4.5: 16000, 5.0: 16000, 6.0: 13700, 7.0: 11900, 8.0: 10500, 9.0: 8650, 10.0: 7000, 12.0: 4800, 14.0: 3400, 16.0: 2400 },
+    21.3: { 3.0: 12000, 3.5: 12000, 4.0: 12000, 4.5: 12000, 5.0: 12000, 6.0: 12000, 7.0: 11000, 8.0: 10200, 9.0: 9100, 10.0: 7400, 12.0: 5100, 14.0: 3700, 16.0: 2700, 18.0: 2000 },
+    24.9: { 3.0: 11500, 3.5: 11500, 4.0: 11500, 4.5: 11500, 5.0: 11500, 6.0: 11500, 7.0: 10000, 8.0: 8900, 9.0: 8000, 10.0: 7200, 12.0: 5500, 14.0: 4000, 16.0: 2950, 18.0: 2200, 20.0: 1650, 22.0: 1250 },
+    28.5: { 3.0: 9000, 3.5: 9000, 4.0: 9000, 4.5: 9000, 5.0: 9000, 6.0: 9000, 7.0: 9000, 8.0: 8200, 9.0: 7450, 10.0: 6750, 12.0: 5650, 14.0: 4300, 16.0: 3100, 18.0: 2250, 20.0: 1750, 22.0: 1350, 24.0: 1100 },
+    32.1: { 3.5: 7000, 4.0: 7000, 4.5: 7000, 5.0: 7000, 6.0: 7000, 7.0: 7000, 8.0: 7000, 9.0: 6250, 10.0: 5700, 12.0: 4800, 14.0: 4100, 16.0: 3200, 18.0: 2350, 20.0: 1850, 22.0: 1450, 24.0: 1200, 26.0: 900, 28.0: 650 }
+  }
+};
+
+export const CHARTS_MD300L = {
+  FRONTAL: MD300L_FRONTAL,
+  LATERAL_TRASEIRA: MD300L_LATERAL
+} as const;
+
 // Tabela Oficial Luna TM 130
 export const CHART_TM130: ChartTM130 = {
   angles: [0, 10, 20, 30, 35, 40, 45, 50, 55, 60, 65, 70],
@@ -23,3 +49,11 @@ export const CHART_TM130: ChartTM130 = {
     45: 4000, 50: 5100, 55: 6100, 60: 7700, 65: 11200, 70: 20400
   }
 };
+
+/**
+ * Comprimento de tabela a usar para uma lança de comprimento qualquer (MD300L):
+ * o PRÓXIMO comprimento tabelado (conservador). Acima de 32,1 m => null.
+ */
+export function tableLengthFor(len: number): number | null {
+  return MD300L_LENGTHS.find((l) => l >= len - 1e-6) ?? null;
+}

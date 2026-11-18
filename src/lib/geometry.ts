@@ -1,4 +1,5 @@
 import type { AngleRange } from '../types';
+import { CARGO_HALF_SIZE_M } from '../data/craneSpecs';
 
 export const degToRad = (deg: number): number => (deg * Math.PI) / 180;
 export const radToDeg = (rad: number): number => (rad * 180) / Math.PI;
@@ -46,4 +47,15 @@ export function computeGeometry(
     maxPossibleRadius: boomLength * Math.cos(degToRad(angleRange.min)),
     minPossibleRadius: Math.max(0.5, boomLength * Math.cos(degToRad(angleRange.max)))
   };
+}
+
+/** Altura (m) do centro da carga: pendurada no cabo, ou apoiada no solo. */
+export function loadCenterHeight(tipHeight: number, cableLength: number): number {
+  return Math.max(CARGO_HALF_SIZE_M, tipHeight - cableLength);
+}
+
+/** A carga está fora do solo (suspensa)? */
+export function isLoadAirborne(boomLength: number, angleDeg: number, cableLength: number): boolean {
+  const tipHeight = boomLength * Math.sin(degToRad(angleDeg)) + PIVOT_HEIGHT_M;
+  return loadCenterHeight(tipHeight, cableLength) > CARGO_HALF_SIZE_M + 0.05;
 }

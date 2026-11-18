@@ -57,6 +57,7 @@ body {
 /* Abas de Visão */
 .view-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -64,8 +65,8 @@ body {
   background: #1e293b;
   border: 1px solid #334155;
   color: #cbd5e1;
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 8px 16px;
+  font-size: 13px;
   font-weight: 500;
   border-radius: 6px;
   cursor: pointer;
@@ -82,8 +83,16 @@ body {
 /* Layout Principal */
 .main-content {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 20px;
+  align-items: start;
+}
+
+.main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
 }
 
 @media (max-width: 960px) {
@@ -109,19 +118,10 @@ body {
   align-items: center;
 }
 
-.instruction-badge {
-  font-size: 12px;
-  background: #1e293b;
-  color: #38bdf8;
-  padding: 6px 12px;
-  border-radius: 20px;
-  border: 1px solid rgba(56, 189, 248, 0.2);
-}
-
 .canvas-wrapper-3d,
 .canvas-wrapper-2d {
   width: 100%;
-  height: 480px;
+  height: 540px;
   background: #030712;
   border-radius: 8px;
   border: 1px solid #1f2937;
@@ -140,7 +140,8 @@ body {
 .controls-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+  min-width: 0;
 }
 
 .control-group {
@@ -351,78 +352,6 @@ body {
   cursor: pointer;
 }
 
-/* Tabela Oficial */
-.table-section {
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.legend-badge {
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-.table-wrapper {
-  overflow-x: auto;
-}
-
-.load-chart-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  text-align: center;
-}
-
-.load-chart-table th,
-.load-chart-table td {
-  padding: 8px 10px;
-  border: 1px solid #1f2937;
-}
-
-.load-chart-table th {
-  background: #1e293b;
-  color: #cbd5e1;
-  font-weight: 600;
-}
-
-.load-chart-table .col-highlight {
-  background: #334155;
-  color: #ffffff;
-}
-
-.load-chart-table .row-header {
-  background: #1e293b;
-  font-weight: 600;
-  color: #cbd5e1;
-}
-
-.cell-value {
-  color: #6b7280;
-}
-
-.cell-value.active-safe {
-  background: #065f46 !important;
-  color: #ffffff !important;
-  font-weight: 700;
-}
-
-.cell-value.active-warning {
-  background: #78350f !important;
-  color: #ffffff !important;
-  font-weight: 700;
-}
-
-.cell-value.active-overload {
-  background: #991b1b !important;
-  color: #ffffff !important;
-  font-weight: 700;
-}
-
 /* Modal */
 .modal-backdrop {
   position: fixed;
@@ -540,4 +469,164 @@ body {
   font-size: 11px;
   color: #cbd5e1;
   line-height: 1.4;
+}
+/* ===== Reorganização da tela ===== */
+
+/* Barra de status (veredito) */
+.status-bar {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-left: 6px solid;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+}
+
+.status-bar-ok { border-left-color: #10b981; }
+.status-bar-fail { border-left-color: #ef4444; }
+
+.status-verdict {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.status-icon { font-size: 28px; }
+
+.status-verdict strong {
+  font-size: 16px;
+  color: #ffffff;
+}
+
+.status-bar-ok .status-verdict strong { color: #10b981; }
+.status-bar-fail .status-verdict strong { color: #ef4444; }
+
+.status-verdict p {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.status-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.status-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.status-sector {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.status-progress { margin-top: 0; }
+
+/* Seções de controles */
+.control-section {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.control-section .control-group {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  gap: 8px;
+}
+
+.control-section .control-group + .control-group {
+  padding-top: 14px;
+  border-top: 1px solid #1f2937;
+}
+
+/* Telemetria sob o desenho */
+.telemetry-grid.cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.warnings-box { margin-top: 0; }
+
+/* Responsivo */
+@media (max-width: 1100px) {
+  .status-bar { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 960px) {
+  .telemetry-grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .header { flex-wrap: wrap; gap: 12px; }
+}
+
+/* Impressão: só o relatório técnico */
+@media print {
+  body { background: #ffffff; padding: 0; }
+  body * { visibility: hidden; }
+  .modal-backdrop,
+  .modal-backdrop * { visibility: visible; }
+  .modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: #ffffff;
+    align-items: flex-start;
+  }
+  .modal-content {
+    background: #ffffff;
+    border: none;
+    color: #000000;
+    width: 100%;
+    max-width: 100%;
+  }
+  .modal-content h2, .modal-content p, .modal-content div, .modal-content strong { color: #000000; }
+  .modal-footer, .close-btn { display: none !important; }
+  .status-green, .status-red { color: #ffffff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* Atalhos dos comprimentos de lança: 7 chips que cabem na largura, sem rolagem */
+.length-chips {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.length-chips button {
+  min-width: 0;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  padding: 6px 0;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.length-chips button.active {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #ffffff;
+  font-weight: 600;
 }
