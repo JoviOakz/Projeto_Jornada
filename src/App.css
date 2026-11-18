@@ -367,8 +367,10 @@ body {
   background: #111827;
   border: 1px solid #374151;
   border-radius: 12px;
-  width: 520px;
-  max-width: 90%;
+  width: 580px;
+  max-width: 92%;
+  max-height: 92vh;
+  overflow-y: auto;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -629,4 +631,80 @@ body {
   border-color: #3b82f6;
   color: #ffffff;
   font-weight: 600;
+}
+
+/* Selo de integridade */
+.integrity-box {
+  background: #0b1220;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.integrity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.integrity-seal {
+  font-family: monospace;
+  font-size: 11px;
+  color: #38bdf8;
+  background: #030712;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  padding: 8px 10px;
+  word-break: break-all;
+}
+
+.integrity-copy { align-self: flex-start; }
+.integrity-copy:disabled, .integrity-verify button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.integrity-verify summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+.integrity-verify[open] { display: flex; flex-direction: column; gap: 10px; }
+
+.integrity-textarea {
+  width: 100%;
+  min-height: 110px;
+  background: #030712;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #f3f4f6;
+  font-family: monospace;
+  font-size: 11px;
+  padding: 8px;
+  resize: vertical;
+}
+
+.integrity-verify button { align-self: flex-start; }
+
+.integrity-result {
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.integrity-result ul { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.integrity-ok { background: #065f46; color: #ffffff; }
+.integrity-fail { background: #991b1b; color: #ffffff; }
+
+@media print {
+  .integrity-box { background: #ffffff; border-color: #999999; }
+  .integrity-seal { background: #ffffff; color: #000000; border-color: #999999; }
+  .integrity-copy, .integrity-verify { display: none !important; }
 }

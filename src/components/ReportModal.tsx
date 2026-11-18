@@ -2,6 +2,7 @@ import React from 'react';
 import type { LiftAnalysis, LiftInputs } from '../types';
 import { NORMATIVE_LIMIT_PCT } from '../lib/capacity';
 import { SECTOR_LABELS } from '../lib/limits';
+import { IntegritySeal } from './IntegritySeal';
 
 interface ReportModalProps {
   inputs: LiftInputs;
@@ -73,6 +74,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ inputs, analysis, exte
           <div className={`status-box ${approved ? 'status-green' : 'status-red'}`}>
             STATUS FINAL DE OPERAÇÃO: {statusLabel}
           </div>
+          <IntegritySeal inputs={inputs} analysis={analysis} extendedUnderLoad={extendedUnderLoad} />
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={() => window.print()}>🖨️ Imprimir PDF</button>
