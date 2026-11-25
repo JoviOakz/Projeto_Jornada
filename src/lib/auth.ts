@@ -6,7 +6,7 @@ import { sha256Hex } from './integrity';
  * real: quem abre o código ou o DevTools consegue contornar. Serve para demonstrar perfis de acesso (RBAC).
  * Em produção a autenticação e as permissões têm que ser validadas no servidor.
  */
-export type Role = 'EXTERNO' | 'FUNCIONARIO' | 'ADMIN';
+export type Role = 'VISITANTE' | 'FUNCIONARIO' | 'ADMIN';
 export type AppTab = 'PLAN' | 'TABLE' | 'REPORT' | 'ADMIN';
 
 export interface RoleInfo {
@@ -17,8 +17,8 @@ export interface RoleInfo {
 }
 
 export const ROLES: Record<Role, RoleInfo> = {
-  EXTERNO: {
-    label: 'Externo',
+  VISITANTE: {
+    label: 'Visitante',
     summary: 'Só simula no planejamento. Não vê as tabelas de carga nem emite relatórios.',
     tabs: ['PLAN'],
     canEditTables: false
@@ -40,16 +40,9 @@ export const ROLES: Record<Role, RoleInfo> = {
 interface UserRecord { username: string; salt: string; hash: string; role: Role }
 
 const USERS: UserRecord[] = [
-  { username: 'externo', salt: 'gr-ext-7f3a', hash: '1b54645a513e67d9472b7a12048a750b5d64560150441148d954e6842e0f8e4d', role: 'EXTERNO' },
-  { username: 'funcionario', salt: 'gr-fun-2b91', hash: 'c2b868701151ce2646d41511b07900eb6d3369de0295b8a0efef272878718d53', role: 'FUNCIONARIO' },
-  { username: 'admin', salt: 'gr-adm-c408', hash: 'd14fd68ad61b9dd6708aee226d5c6003408af237f4071bda905323cccd873708', role: 'ADMIN' }
-];
-
-/** Acessos mostrados na tela de login, só para a demonstração. */
-export const DEMO_ACCESS: { username: string; password: string; role: Role }[] = [
-  { username: 'externo', password: '1234', role: 'EXTERNO' },
-  { username: 'funcionario', password: 'func@2026', role: 'FUNCIONARIO' },
-  { username: 'admin', password: 'Admin@Ribas2026', role: 'ADMIN' }
+  { username: 'visitantes', salt: 'gr-ext-7f3a', hash: '1b54645a513e67d9472b7a12048a750b5d64560150441148d954e6842e0f8e4d', role: 'VISITANTE' },
+  { username: 'funcionario', salt: 'gr-fun-2b91', hash: '6e41bcf38bd63a80f1a6c5612ee871139c874b134f55a3742096370dd144c844', role: 'FUNCIONARIO' },
+  { username: 'admin', salt: 'gr-adm-c408', hash: '639a0fbe9a18de4653c395cd15b1b36d149352558d090c3d087243e1a212afb9', role: 'ADMIN' }
 ];
 
 export interface Session { username: string; role: Role }
