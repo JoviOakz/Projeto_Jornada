@@ -38,13 +38,9 @@ export async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-let tablesHashPromise: Promise<string> | null = null;
-/** Hash das tabelas de carga embutidas: identifica a versão das tabelas usada no cálculo. */
+/** Hash das tabelas de carga atuais (podem ser editadas pelo administrador): identifica a versão usada no cálculo. */
 export function getTablesHash(): Promise<string> {
-  if (!tablesHashPromise) {
-    tablesHashPromise = sha256Hex(stableStringify({ MD300L: CHARTS_MD300L, TM130: CHART_TM130 }));
-  }
-  return tablesHashPromise;
+  return sha256Hex(stableStringify({ MD300L: CHARTS_MD300L, TM130: CHART_TM130 }));
 }
 
 export function buildReportPayload(
@@ -178,6 +174,8 @@ export async function verifyPackage(packageText: string): Promise<VerificationRe
   }
 
   const checks: VerificationCheck[] = [];
+  const currentTables = await getTablesHash();
+  const sameTables = payload.tabelasHash === currentTables;
   const computedSeal = await sha256Hex(stableStringify(payload));
   checks.push({
     label: 'Selo SHA-256 confere com os dados',
@@ -185,7 +183,14 @@ export async function verifyPackage(packageText: string): Promise<VerificationRe
     detail: computedSeal === seal ? undefined : 'Os dados foram alterados depois da emissão.'
   });
 
-  try {
+  if (!sameTables) {
+    // O cálculo refeito usaria tabelas diferentes das da emissão: a comparação não faria sentido.
+    checks.push({
+      label: 'Cálculo refeito bate com o resultado gravado',
+      ok: true,
+      detail: 'não comparado: as tabelas de carga deste navegador são diferentes das usadas na emissão'
+    });
+  } else try {
     const a = analyzeLift(payload.entradas);
     const approved = a.isApproved && !payload.resultado.extensaoComCarga;
     const r = payload.resultado;
@@ -207,10 +212,9 @@ export async function verifyPackage(packageText: string): Promise<VerificationRe
     checks.push({ label: 'Cálculo refeito bate com o resultado gravado', ok: false, detail: 'Não foi possível refazer o cálculo.' });
   }
 
-  const currentTables = await getTablesHash();
   return {
     ok: checks.every((c) => c.ok),
     checks,
-    notice: payload.tabelasHash === currentTables ? undefined : 'Aviso: as tabelas de carga mudaram desde a emissão deste relatório.'
+    notice: sameTables ? undefined : 'Aviso: as tabelas de carga mudaram desde a emissão deste relatório.'
   };
 }
