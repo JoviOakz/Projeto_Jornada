@@ -6,7 +6,7 @@ interface AdminPanelProps {
   onTablesChanged: () => void;
 }
 
-const ROLE_ORDER: Role[] = ['EXTERNO', 'FUNCIONARIO', 'ADMIN'];
+const ROLE_ORDER: Role[] = ['VISITANTE', 'FUNCIONARIO', 'ADMIN'];
 
 const ACCESS_ROWS: { label: string; has: (role: Role) => string }[] = [
   { label: 'Planejamento (simulador 3D)', has: (r) => (ROLES[r].tabs.includes('PLAN') ? 'Sim' : 'Não') },

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { DEMO_ACCESS, ROLES, authenticate, type Session } from '../lib/auth';
+import { authenticate, type Session } from '../lib/auth';
 
 interface LoginScreenProps {
   onLogin: (session: Session) => void;
@@ -93,28 +93,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         <button className="btn-primary login-submit" type="submit" disabled={locked || busy}>
           {busy ? 'Verificando…' : 'Entrar'}
         </button>
-
-        <details className="tech-details">
-          <summary>Acessos de demonstração</summary>
-          <table className="demo-table">
-            <thead>
-              <tr><th>Perfil</th><th>Usuário</th><th>Senha</th></tr>
-            </thead>
-            <tbody>
-              {DEMO_ACCESS.map((a) => (
-                <tr key={a.username}>
-                  <td>{ROLES[a.role].label}</td>
-                  <td><code>{a.username}</code></td>
-                  <td><code>{a.password}</code></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="muted small">
-            Login de demonstração feito só no navegador (sem servidor). As senhas são guardadas como hash SHA-256,
-            mas isso não substitui autenticação de verdade.
-          </p>
-        </details>
 
         <p className="muted small">
           Para conferir um relatório impresso, escaneie o QR code dele: a verificação não exige login.
