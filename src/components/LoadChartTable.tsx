@@ -4,14 +4,19 @@ import { CHARTS_MD300L, CHART_TM130, MD300L_LENGTHS } from '../data/charts';
 import { MD300L_MAX_ANGLE_DEG, TM130_BOOM_LENGTH_M } from '../data/craneSpecs';
 import { HOOK_WEIGHT_KG, NORMATIVE_LIMIT_PCT } from '../lib/capacity';
 import { radiusToAngleDeg } from '../lib/geometry';
+import { isOverridden, mdKey, setCapacity, tmKey } from '../lib/tableStore';
 
 interface LoadChartTableProps {
   inputs: LiftInputs;
   analysis: LiftAnalysis;
+  /** Administrador: pode editar a capacidade de cada linha. */
+  editable?: boolean;
+  onTablesChanged?: () => void;
 }
 
 interface Row {
   key: string;
+  editKey: string;
   angle: number;
   radius: number;
   capacity: number;
@@ -32,7 +37,7 @@ function limits(capacity: number, hookKg: number) {
   return { limit, maxPayload: Math.max(0, limit - hookKg) };
 }
 
-export const LoadChartTable: React.FC<LoadChartTableProps> = ({ inputs, analysis }) => {
+export const LoadChartTable: React.FC<LoadChartTableProps> = ({ inputs, analysis, editable = false, onTablesChanged }) => {
   const [model, setModel] = useState<CraneModel>(inputs.model);
   const [sector, setSector] = useState<MdSector>(
     analysis.sector === 'FRONTAL' ? 'FRONTAL' : 'LATERAL_TRASEIRA'
@@ -63,6 +68,7 @@ export const LoadChartTable: React.FC<LoadChartTableProps> = ({ inputs, analysis
       const angle = radiusToAngleDeg(r, length);
       rows.push({
         key: `r${r}`,
+        editKey: mdKey(sector, length, r),
         angle,
         radius: r,
         capacity,
@@ -79,6 +85,7 @@ export const LoadChartTable: React.FC<LoadChartTableProps> = ({ inputs, analysis
       const capacity = CHART_TM130.capacities[a];
       rows.push({
         key: `a${a}`,
+        editKey: tmKey(a),
         angle: a,
         radius: L * Math.cos((a * Math.PI) / 180),
         capacity,
@@ -99,7 +106,10 @@ export const LoadChartTable: React.FC<LoadChartTableProps> = ({ inputs, analysis
           <h2 className="card-title">Tabela de carga</h2>
           <p className="muted">
             Valores do catálogo do fabricante, já incluindo o peso do gancho ({hookKg} kg). A linha em destaque é o
-            ponto atual do simulador.
+            ponto atual do simulador.{' '}
+            {editable
+              ? 'Modo administrador: altere a capacidade e saia do campo (ou tecle Enter) para salvar. As mudanças ficam só neste navegador.'
+              : 'Somente consulta: apenas administradores podem alterar os valores.'}
           </p>
         </div>
         <button className="btn-secondary" onClick={syncWithSimulator}>🎯 Usar ponto atual</button>
@@ -159,7 +169,32 @@ export const LoadChartTable: React.FC<LoadChartTableProps> = ({ inputs, analysis
                 <tr key={r.key} className={`${r.current ? 'row-current' : ''} ${r.unreachable ? 'row-dim' : ''}`}>
                   <td>{fmt(r.angle, model === 'TM130' ? 0 : 1)}°{r.unreachable ? ' *' : ''}</td>
                   <td>{fmt(r.radius, 1)} m</td>
-                  <td>{fmt(r.capacity)} kg</td>
+                  <td>
+                    {editable ? (
+                      <span className="cap-edit">
+                        <input
+                          className="cap-input"
+                          type="number"
+                          min={1}
+                          step={50}
+                          aria-label={`Capacidade em kg, ${fmt(r.radius, 1)} m`}
+                          key={`${r.editKey}-${r.capacity}`}
+                          defaultValue={r.capacity}
+                          onBlur={(e) => {
+                            const v = Number(e.target.value);
+                            if (v === r.capacity) return;
+                            if (setCapacity(r.editKey, v)) onTablesChanged?.();
+                            else e.target.value = String(r.capacity);
+                          }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                        />{' '}
+                        kg
+                      </span>
+                    ) : (
+                      <>{fmt(r.capacity)} kg</>
+                    )}
+                    {isOverridden(r.editKey) && <span className="edited-flag" title="Valor alterado pelo administrador"> ✎ editado</span>}
+                  </td>
                   <td>{fmt(r.limit)} kg</td>
                   <td>{fmt(r.maxPayload)} kg</td>
                   <td className={over ? 'text-red' : 'text-green'}>
