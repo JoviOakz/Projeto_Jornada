@@ -9,7 +9,8 @@ import { Crane3D } from './components/Crane3D';
 import { Crane2D } from './components/Crane2D';
 import { ControlsPanel } from './components/ControlsPanel';
 import { TelemetryPanel } from './components/TelemetryPanel';
-import { ReportModal } from './components/ReportModal';
+import { ReportPanel } from './components/ReportPanel';
+import { LoadChartTable } from './components/LoadChartTable';
 import { StatusBar } from './components/StatusBar';
 import { VerifyModal } from './components/VerifyModal';
 import { readPackageFromHash } from './lib/integrity';
@@ -29,10 +30,18 @@ const VIEW_TABS: { mode: ViewMode; label: string }[] = [
   { mode: '2D_TOP', label: '🔍 Planta' }
 ];
 
+type AppTab = 'PLAN' | 'TABLE' | 'REPORT';
+
+const APP_TABS: { id: AppTab; label: string }[] = [
+  { id: 'PLAN', label: 'Planejamento' },
+  { id: 'TABLE', label: 'Tabela de carga' },
+  { id: 'REPORT', label: 'Relatório e segurança' }
+];
+
 export const App: React.FC = () => {
   const [inputs, setInputs] = useState<LiftInputs>(INITIAL_INPUTS);
   const [viewMode, setViewMode] = useState<ViewMode>('3D');
-  const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
+  const [tab, setTab] = useState<AppTab>('PLAN');
 
   // Link/QR de verificação: abre a tela de verificação com o pacote já carregado.
   const [verifyText, setVerifyText] = useState<string | null>(() =>
@@ -68,66 +77,75 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container">
-      {/* Cabeçalho */}
       <header className="header">
         <div className="header-brand">
           <span className="logo-icon">🏗️</span>
           <div>
-            <h1>Análise e Planejamento de Içamentos</h1>
-            <p>Guindastes Ribas Ltda. — Protótipo de Engenharia Operacional</p>
+            <h1>Planejamento de Içamentos</h1>
+            <p>Guindastes Ribas Ltda.</p>
           </div>
         </div>
-        <div className="header-actions">
-          <button className="btn-primary" onClick={() => setIsReportOpen(true)}>
-            📄 Gerar Relatório Técnico
-          </button>
-        </div>
+
+        <nav className="app-tabs" role="tablist" aria-label="Seções do sistema">
+          {APP_TABS.map(({ id, label }) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              className={tab === id ? 'active' : ''}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
       </header>
 
-      <StatusBar analysis={analysis} extendedUnderLoad={extendedUnderLoad} />
+      {tab === 'PLAN' && (
+        <>
+          <StatusBar analysis={analysis} extendedUnderLoad={extendedUnderLoad} />
 
-      <main className="main-content">
-        <div className="main-column">
-          <section className="canvas-card">
-            <div className="card-header">
-              <div className="view-tabs">
-                {VIEW_TABS.map(({ mode, label }) => (
-                  <button
-                    key={mode}
-                    className={viewMode === mode ? 'active' : ''}
-                    onClick={() => setViewMode(mode)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+          <main className="main-content">
+            <div className="main-column">
+              <section className="canvas-card">
+                <div className="card-header">
+                  <div className="view-tabs">
+                    {VIEW_TABS.map(({ mode, label }) => (
+                      <button
+                        key={mode}
+                        className={viewMode === mode ? 'active' : ''}
+                        onClick={() => setViewMode(mode)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {viewMode === '3D' ? (
+                  <Crane3D inputs={inputs} analysis={analysis} />
+                ) : (
+                  <Crane2D view={viewMode} inputs={inputs} analysis={analysis} />
+                )}
+              </section>
+
+              <TelemetryPanel analysis={analysis} extendedUnderLoad={extendedUnderLoad} />
             </div>
 
-            {viewMode === '3D' ? (
-              <Crane3D inputs={inputs} analysis={analysis} />
-            ) : (
-              <Crane2D view={viewMode} inputs={inputs} analysis={analysis} />
-            )}
-          </section>
+            <aside className="controls-sidebar">
+              <ControlsPanel inputs={inputs} analysis={analysis} onChange={updateInputs} />
+            </aside>
+          </main>
+        </>
+      )}
 
-          <TelemetryPanel analysis={analysis} extendedUnderLoad={extendedUnderLoad} />
-        </div>
+      {tab === 'TABLE' && <LoadChartTable inputs={inputs} analysis={analysis} />}
 
-        <aside className="controls-sidebar">
-          <ControlsPanel inputs={inputs} analysis={analysis} onChange={updateInputs} />
-        </aside>
-      </main>
+      {tab === 'REPORT' && (
+        <ReportPanel inputs={inputs} analysis={analysis} extendedUnderLoad={extendedUnderLoad} />
+      )}
 
       {verifyText !== null && <VerifyModal packageText={verifyText} onClose={closeVerify} />}
-
-      {isReportOpen && (
-        <ReportModal
-          inputs={inputs}
-          analysis={analysis}
-          extendedUnderLoad={extendedUnderLoad}
-          onClose={() => setIsReportOpen(false)}
-        />
-      )}
     </div>
   );
 };
