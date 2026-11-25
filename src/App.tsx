@@ -11,9 +11,12 @@ import { ControlsPanel } from './components/ControlsPanel';
 import { TelemetryPanel } from './components/TelemetryPanel';
 import { ReportPanel } from './components/ReportPanel';
 import { LoadChartTable } from './components/LoadChartTable';
+import { AdminPanel } from './components/AdminPanel';
+import { LoginScreen } from './components/LoginScreen';
 import { StatusBar } from './components/StatusBar';
 import { VerifyModal } from './components/VerifyModal';
 import { readPackageFromHash } from './lib/integrity';
+import { ROLES, loadSession, saveSession, type AppTab, type Session } from './lib/auth';
 
 const INITIAL_INPUTS: LiftInputs = {
   model: 'MD300L',
@@ -30,32 +33,27 @@ const VIEW_TABS: { mode: ViewMode; label: string }[] = [
   { mode: '2D_TOP', label: '🔍 Planta' }
 ];
 
-type AppTab = 'PLAN' | 'TABLE' | 'REPORT';
-
 const APP_TABS: { id: AppTab; label: string }[] = [
   { id: 'PLAN', label: 'Planejamento' },
   { id: 'TABLE', label: 'Tabela de carga' },
-  { id: 'REPORT', label: 'Relatório e segurança' }
+  { id: 'REPORT', label: 'Relatório e segurança' },
+  { id: 'ADMIN', label: 'Administração' }
 ];
 
-export const App: React.FC = () => {
+interface WorkspaceProps {
+  session: Session;
+  onLogout: () => void;
+}
+
+const Workspace: React.FC<WorkspaceProps> = ({ session, onLogout }) => {
+  const role = ROLES[session.role];
+  const visibleTabs = APP_TABS.filter((t) => role.tabs.includes(t.id));
+  const [tablesVersion, setTablesVersion] = useState(0);
+  const onTablesChanged = useCallback(() => setTablesVersion((v) => v + 1), []);
+
   const [inputs, setInputs] = useState<LiftInputs>(INITIAL_INPUTS);
   const [viewMode, setViewMode] = useState<ViewMode>('3D');
   const [tab, setTab] = useState<AppTab>('PLAN');
-
-  // Link/QR de verificação: abre a tela de verificação com o pacote já carregado.
-  const [verifyText, setVerifyText] = useState<string | null>(() =>
-    typeof window === 'undefined' ? null : readPackageFromHash(window.location.hash)
-  );
-  useEffect(() => {
-    const onHash = () => setVerifyText(readPackageFromHash(window.location.hash));
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  }, []);
-  const closeVerify = () => {
-    window.history.replaceState(null, '', window.location.pathname + window.location.search);
-    setVerifyText(null);
-  };
 
   // A extensão da lança só pode ser feita sem carga (catálogo MD 300L).
   const [extendedUnderLoad, setExtendedUnderLoad] = useState<boolean>(false);
@@ -73,7 +71,7 @@ export const App: React.FC = () => {
     [inputs]
   );
 
-  const analysis = useLiftAnalysis(inputs);
+  const analysis = useLiftAnalysis(inputs, tablesVersion);
 
   return (
     <div className="app-container">
@@ -87,7 +85,7 @@ export const App: React.FC = () => {
         </div>
 
         <nav className="app-tabs" role="tablist" aria-label="Seções do sistema">
-          {APP_TABS.map(({ id, label }) => (
+          {visibleTabs.map(({ id, label }) => (
             <button
               key={id}
               role="tab"
@@ -99,6 +97,11 @@ export const App: React.FC = () => {
             </button>
           ))}
         </nav>
+
+        <div className="user-chip">
+          <span>👤 {session.username} · <strong>{role.label}</strong></span>
+          <button className="btn-secondary" onClick={onLogout}>Sair</button>
+        </div>
       </header>
 
       {tab === 'PLAN' && (
@@ -139,14 +142,51 @@ export const App: React.FC = () => {
         </>
       )}
 
-      {tab === 'TABLE' && <LoadChartTable inputs={inputs} analysis={analysis} />}
+      {tab === 'TABLE' && role.tabs.includes('TABLE') && (
+        <LoadChartTable
+          inputs={inputs}
+          analysis={analysis}
+          editable={role.canEditTables}
+          onTablesChanged={onTablesChanged}
+        />
+      )}
 
-      {tab === 'REPORT' && (
+      {tab === 'REPORT' && role.tabs.includes('REPORT') && (
         <ReportPanel inputs={inputs} analysis={analysis} extendedUnderLoad={extendedUnderLoad} />
       )}
 
-      {verifyText !== null && <VerifyModal packageText={verifyText} onClose={closeVerify} />}
+      {tab === 'ADMIN' && role.tabs.includes('ADMIN') && <AdminPanel onTablesChanged={onTablesChanged} />}
     </div>
+  );
+};
+
+
+export const App: React.FC = () => {
+  const [session, setSession] = useState<Session | null>(() => loadSession());
+
+  // Link/QR de verificação: abre a tela de verificação com o pacote já carregado.
+  const [verifyText, setVerifyText] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : readPackageFromHash(window.location.hash)
+  );
+  useEffect(() => {
+    const onHash = () => setVerifyText(readPackageFromHash(window.location.hash));
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+  const closeVerify = () => {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    setVerifyText(null);
+  };
+
+  const login = (s: Session) => { saveSession(s); setSession(s); };
+  const logout = () => { saveSession(null); setSession(null); };
+
+  return (
+    <>
+      {session ? <Workspace session={session} onLogout={logout} /> : <LoginScreen onLogin={login} />}
+      {/* A verificação pelo QR code não exige login. */}
+      {verifyText !== null && <VerifyModal packageText={verifyText} onClose={closeVerify} />}
+    </>
   );
 };
 

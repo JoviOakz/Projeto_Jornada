@@ -874,3 +874,54 @@ body { background: radial-gradient(1200px 600px at 20% -10%, #14213d 0%, var(--b
   .report-list { grid-template-columns: 1fr; }
   .verify-main { justify-content: center; }
 }
+
+
+/* ===== Login, perfis e administração ===== */
+.user-chip { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #cbd5e1; }
+.user-chip .btn-secondary { padding: 6px 12px; }
+
+.login-wrap { min-height: 80vh; display: flex; align-items: center; justify-content: center; }
+.login-card { width: 100%; max-width: 440px; gap: 18px; }
+.login-brand { display: flex; gap: 14px; align-items: center; }
+.login-brand h1 { font-size: 20px; color: #ffffff; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.text-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: #f3f4f6;
+  font: inherit;
+  font-size: 15px;
+  padding: 11px 14px;
+}
+.text-input:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.login-submit { padding: 12px 16px; font-size: 15px; border-radius: 10px; }
+.login-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.login-error { color: #fca5a5; background: rgba(239, 68, 68, 0.12); border: 1px solid #7f1d1d; border-radius: 10px; padding: 10px 14px; font-size: 14px; }
+.demo-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.demo-table th { text-align: left; color: var(--muted); font-size: 12px; text-transform: uppercase; padding: 6px 8px; }
+.demo-table td { padding: 6px 8px; border-top: 1px solid var(--border); }
+.demo-table code { font-family: ui-monospace, Menlo, monospace; color: var(--accent); }
+
+.admin-grid { display: grid; gap: 20px; }
+.access-table th, .access-table td { text-align: center; }
+.access-table th:first-child, .access-table td:first-child { text-align: left; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.cap-input {
+  width: 110px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: #f3f4f6;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding: 5px 8px;
+}
+.cap-input:focus-visible { outline: 2px solid var(--accent); }
+.edited-flag { color: var(--accent); font-size: 12px; font-weight: 600; }
+
+@media (max-width: 960px) {
+  .user-chip { width: 100%; justify-content: space-between; }
+}
